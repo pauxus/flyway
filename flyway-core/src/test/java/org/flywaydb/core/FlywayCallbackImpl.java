@@ -18,17 +18,20 @@ package org.flywaydb.core;
 import static org.junit.Assert.assertNotNull;
 
 import java.sql.Connection;
+
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.MigrationInfo;
 
 /**
  * Sample FlywayCallback implementation to test that the lifecycle
  * notifications are getting called correctly
- * 
+ *
  * @author Dan Bunker
  *
  */
 public class FlywayCallbackImpl implements FlywayCallback {
+
+    private Flyway flyway;
 	private boolean beforeClean = false;
 	private boolean afterClean = false;
 	private boolean beforeMigrate = false;
@@ -184,6 +187,15 @@ public class FlywayCallbackImpl implements FlywayCallback {
 
 	public boolean isAfterInfo() {
 		return afterInfo;
+	}
+
+	public boolean isFlywaySet() {
+	    return flyway != null;
+	}
+
+	@Override
+	public void setFlyway(Flyway flyway) {
+	    this.flyway = flyway;
 	}
 
 }

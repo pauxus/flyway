@@ -23,7 +23,7 @@ import org.junit.Test;
 
 /**
  * Tests for Flyway Callbacks
- * 
+ *
  * @author Dan Bunker
  *
  */
@@ -47,10 +47,12 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
+
+        assertTrue(callbackImpl.isFlywaySet());
 
         assertNotNull(flyway.getDataSource());
 
@@ -58,7 +60,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterClean());
 
         flyway.clean();
-        
+
         assertEquals(true, callbackImpl.isBeforeClean());
         assertEquals(true, callbackImpl.isAfterClean());
 
@@ -84,7 +86,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -95,7 +97,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterInfo());
 
         flyway.info();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(false, callbackImpl.isAfterEachMigrate());
@@ -119,7 +121,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -130,7 +132,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterInit());
 
         flyway.init();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(false, callbackImpl.isAfterEachMigrate());
@@ -154,7 +156,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -165,7 +167,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterMigrate());
 
         flyway.migrate();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(false, callbackImpl.isAfterEachMigrate());
@@ -173,14 +175,14 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterInit());
         assertEquals(true, callbackImpl.isAfterMigrate());
         assertEquals(false, callbackImpl.isAfterRepair());
-        assertEquals(false, callbackImpl.isAfterValidate());
+        assertEquals(true, callbackImpl.isAfterValidate());
 
         assertEquals(false, callbackImpl.isBeforeEachMigrate());
         assertEquals(false, callbackImpl.isBeforeInfo());
         assertEquals(false, callbackImpl.isBeforeInit());
         assertEquals(true, callbackImpl.isBeforeMigrate());
         assertEquals(false, callbackImpl.isBeforeRepair());
-        assertEquals(false, callbackImpl.isBeforeValidate());
+        assertEquals(true, callbackImpl.isBeforeValidate());
     }
 
     @Test
@@ -189,7 +191,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -200,7 +202,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterRepair());
 
         flyway.repair();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(false, callbackImpl.isAfterEachMigrate());
@@ -224,7 +226,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -235,7 +237,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterRepair());
 
         flyway.validate();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(false, callbackImpl.isAfterEachMigrate());
@@ -260,7 +262,7 @@ public class FlywayCallbackTest {
 
         FlywayCallbackImpl callbackImpl = new FlywayCallbackImpl();
         FlywayCallback[] callbacks = new FlywayCallback[] { callbackImpl };
-        
+
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
@@ -271,7 +273,7 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterRepair());
 
         flyway.migrate();
-        
+
         assertEquals(false, callbackImpl.isBeforeClean());
         assertEquals(false, callbackImpl.isAfterClean());
         assertEquals(true, callbackImpl.isAfterEachMigrate());
@@ -279,14 +281,14 @@ public class FlywayCallbackTest {
         assertEquals(false, callbackImpl.isAfterInit());
         assertEquals(true, callbackImpl.isAfterMigrate());
         assertEquals(false, callbackImpl.isAfterRepair());
-        assertEquals(false, callbackImpl.isAfterValidate());
+        assertEquals(true, callbackImpl.isAfterValidate());
 
         assertEquals(true, callbackImpl.isBeforeEachMigrate());
         assertEquals(false, callbackImpl.isBeforeInfo());
         assertEquals(false, callbackImpl.isBeforeInit());
         assertEquals(true, callbackImpl.isBeforeMigrate());
         assertEquals(false, callbackImpl.isBeforeRepair());
-        assertEquals(false, callbackImpl.isBeforeValidate());
+        assertEquals(true, callbackImpl.isBeforeValidate());
     }
 
     private Properties createProperties() {

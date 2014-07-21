@@ -15,6 +15,7 @@
  */
 package org.flywaydb.core.api.callback;
 
+import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 
 import java.sql.Connection;
@@ -24,41 +25,41 @@ import java.sql.Connection;
  * Simply add code to the callback method you are interested in having.
  *
  * <p>Each callback method will run within its own transaction.</p>
- * 
+ *
  * @author Dan Bunker
  */
 public interface FlywayCallback {
 	/**
 	 * Runs before the clean task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeClean(Connection connection);
 
 	/**
 	 * Runs after the clean task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterClean(Connection connection);
 
 	/**
 	 * Runs before the migrate task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeMigrate(Connection connection);
 
 	/**
 	 * Runs after the migrate task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterMigrate(Connection connection);
 
 	/**
 	 * Runs before each migration script is executed.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 * @param info The current MigrationInfo for this migration.
 	 */
@@ -66,7 +67,7 @@ public interface FlywayCallback {
 
 	/**
 	 * Runs after each migration script is executed.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 * @param info The current MigrationInfo for this migration.
 	 */
@@ -74,57 +75,64 @@ public interface FlywayCallback {
 
 	/**
 	 * Runs before the validate task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeValidate(Connection connection);
 
 	/**
 	 * Runs after the validate task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterValidate(Connection connection);
 
 	/**
 	 * Runs before the init task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeInit(Connection connection);
 
 	/**
 	 * Runs after the init task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterInit(Connection connection);
 
 	/**
 	 * Runs before the repair task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeRepair(Connection connection);
 
 	/**
 	 * Runs after the repair task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterRepair(Connection connection);
 
 	/**
 	 * Runs before the info task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeInfo(Connection connection);
 
 	/**
 	 * Runs after the info task executes.
-	 * 
+	 *
 	 * @param connection A valid connection to the database.
 	 */
 	void afterInfo(Connection connection);
+
+	/**
+	 * Sets the Flyway instance to provide access to basic configuration.
+	 *
+	 * @param flyway The preconfigured flyway instance.
+	 */
+    void setFlyway(Flyway flyway);
 }

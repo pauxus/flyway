@@ -769,6 +769,9 @@ public class Flyway {
      */
     public void setCallbacks(FlywayCallback... callbacks) {
         this.callbacks = callbacks;
+        for (FlywayCallback flywayCallback : callbacks) {
+            flywayCallback.setFlyway(this);
+        }
     }
 
     /**
@@ -778,7 +781,7 @@ public class Flyway {
      */
     public void setCallbacks(String... callbacks) {
         List<FlywayCallback> callbackList = ClassUtils.instantiateAll(callbacks, classLoader);
-        this.callbacks = callbackList.toArray(new FlywayCallback[callbacks.length]);
+        setCallbacks(callbackList.toArray(new FlywayCallback[callbacks.length]));
     }
 
     /**
