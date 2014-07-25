@@ -15,7 +15,7 @@
  */
 package org.flywaydb.core.api.callback;
 
-import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.MigrationInfo;
 
 import java.sql.Connection;
@@ -129,10 +129,4 @@ public interface FlywayCallback {
 	 */
 	void afterInfo(Connection connection);
 
-	/**
-	 * Sets the Flyway instance to provide access to basic configuration.
-	 *
-	 * @param flyway The preconfigured flyway instance.
-	 */
-    void setFlyway(Flyway flyway);
 }

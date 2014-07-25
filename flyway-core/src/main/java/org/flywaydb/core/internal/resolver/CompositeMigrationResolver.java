@@ -15,6 +15,7 @@
  */
 package org.flywaydb.core.internal.resolver;
 
+import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.api.resolver.ResolvedMigration;
@@ -64,22 +65,19 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * @param placeholderReplacer      The placeholder replacer to use.
      * @param customMigrationResolvers Custom Migration Resolvers.
      */
-    public CompositeMigrationResolver(DbSupport dbSupport, ClassLoader classLoader, Locations locations,
-                                      String encoding,
-                                      String sqlMigrationPrefix, String sqlMigrationSeparator, String sqlMigrationSuffix,
-                                      PlaceholderReplacer placeholderReplacer,
-                                      MigrationResolver... customMigrationResolvers) {
-        for (Location location : locations.getLocations()) {
-            migrationResolvers.add(new SqlMigrationResolver(dbSupport, classLoader, location, placeholderReplacer,
-                    encoding, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix));
-            migrationResolvers.add(new JdbcMigrationResolver(classLoader, location));
+    public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
+        PlaceholderReplacer placeholderReplacer =
+                new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
+        for (Location location : new Locations(config.getLocations()).getLocations()) {
+            migrationResolvers.add(new SqlMigrationResolver(dbSupport, config, location, placeholderReplacer));
+            migrationResolvers.add(new JdbcMigrationResolver(config, location));
 
-            if (new FeatureDetector(classLoader).isSpringJdbcAvailable()) {
-                migrationResolvers.add(new SpringJdbcMigrationResolver(classLoader, location));
+            if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
+                migrationResolvers.add(new SpringJdbcMigrationResolver(config, location));
             }
         }
 
-        migrationResolvers.addAll(Arrays.asList(customMigrationResolvers));
+        migrationResolvers.addAll(Arrays.asList(config.getResolvers()));
     }
 
     /**

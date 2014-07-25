@@ -16,6 +16,7 @@
 package org.flywaydb.core;
 
 
+import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationInfoService;
 import org.flywaydb.core.api.MigrationVersion;
@@ -30,6 +31,7 @@ import org.flywaydb.core.internal.metadatatable.MetaDataTable;
 import org.flywaydb.core.internal.metadatatable.MetaDataTableImpl;
 import org.flywaydb.core.internal.resolver.CompositeMigrationResolver;
 import org.flywaydb.core.internal.util.ClassUtils;
+import org.flywaydb.core.internal.util.InjectionUtils;
 import org.flywaydb.core.internal.util.Locations;
 import org.flywaydb.core.internal.util.PlaceholderReplacer;
 import org.flywaydb.core.internal.util.StringUtils;
@@ -39,6 +41,7 @@ import org.flywaydb.core.internal.util.logging.Log;
 import org.flywaydb.core.internal.util.logging.LogFactory;
 
 import javax.sql.DataSource;
+
 import java.sql.Connection;
 import java.util.*;
 
@@ -47,7 +50,7 @@ import java.util.*;
  * <p/>
  * It is THE public API from which all important Flyway functions such as clean, validate and migrate can be called.
  */
-public class Flyway {
+public class Flyway implements FlywayConfiguration {
     private static final Log LOG = LogFactory.getLog(Flyway.class);
 
     /**
@@ -247,6 +250,7 @@ public class Flyway {
      *
      * @return Locations to scan recursively for migrations. (default: db/migration)
      */
+    @Override
     public String[] getLocations() {
         String[] result = new String[locations.getLocations().size()];
         for (int i = 0; i < locations.getLocations().size(); i++) {
@@ -260,6 +264,7 @@ public class Flyway {
      *
      * @return The encoding of Sql migrations. (default: UTF-8)
      */
+    @Override
     public String getEncoding() {
         return encoding;
     }
@@ -275,6 +280,7 @@ public class Flyway {
      *
      * @return The schemas managed by Flyway. (default: The default schema for the datasource connection)
      */
+    @Override
     public String[] getSchemas() {
         return schemaNames;
     }
@@ -287,6 +293,7 @@ public class Flyway {
      *
      * @return The name of the schema metadata table that will be used by flyway. (default: schema_version)
      */
+    @Override
     public String getTable() {
         return table;
     }
@@ -298,6 +305,7 @@ public class Flyway {
      * @return The target version up to which Flyway should run migrations. Migrations with a higher version number will
      * not be applied. (default: the latest version)
      */
+    @Override
     public MigrationVersion getTarget() {
         return target;
     }
@@ -307,6 +315,7 @@ public class Flyway {
      *
      * @return The map of &lt;placeholder, replacementValue&gt; to apply to sql migration scripts.
      */
+    @Override
     public Map<String, String> getPlaceholders() {
         return placeholders;
     }
@@ -316,6 +325,7 @@ public class Flyway {
      *
      * @return The prefix of every placeholder. (default: ${ )
      */
+    @Override
     public String getPlaceholderPrefix() {
         return placeholderPrefix;
     }
@@ -325,6 +335,7 @@ public class Flyway {
      *
      * @return The suffix of every placeholder. (default: } )
      */
+    @Override
     public String getPlaceholderSuffix() {
         return placeholderSuffix;
     }
@@ -337,6 +348,7 @@ public class Flyway {
      *
      * @return The file name prefix for sql migrations. (default: V)
      */
+    @Override
     public String getSqlMigrationPrefix() {
         return sqlMigrationPrefix;
     }
@@ -349,6 +361,7 @@ public class Flyway {
      *
      * @return The file name separator for sql migrations. (default: __)
      */
+    @Override
     public String getSqlMigrationSeparator() {
         return sqlMigrationSeparator;
     }
@@ -361,6 +374,7 @@ public class Flyway {
      *
      * @return The file name suffix for sql migrations. (default: .sql)
      */
+    @Override
     public String getSqlMigrationSuffix() {
         return sqlMigrationSuffix;
     }
@@ -409,6 +423,7 @@ public class Flyway {
      *
      * @return The version to tag an existing schema with when executing init. (default: 1)
      */
+    @Override
     public MigrationVersion getInitVersion() {
         return initVersion;
     }
@@ -418,6 +433,7 @@ public class Flyway {
      *
      * @return The description to tag an existing schema with when executing init. (default: << Flyway Init >>)
      */
+    @Override
     public String getInitDescription() {
         return initDescription;
     }
@@ -459,6 +475,7 @@ public class Flyway {
      * @return The custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. An empty array if none.
      * (default: none)
      */
+    @Override
     public MigrationResolver[] getResolvers() {
         return resolvers;
     }
@@ -468,6 +485,7 @@ public class Flyway {
      *
      * @return The dataSource to use to access the database. Must have the necessary privileges to execute ddl.
      */
+    @Override
     public DataSource getDataSource() {
         return dataSource;
     }
@@ -478,6 +496,7 @@ public class Flyway {
      * @return The ClassLoader to use for resolving migrations on the classpath.
      * (default: Thread.currentThread().getContextClassLoader() )
      */
+    @Override
     public ClassLoader getClassLoader() {
         return classLoader;
     }
@@ -758,6 +777,7 @@ public class Flyway {
      *
      * @return The callbacks for lifecycle notifications. An empty array if none. (default: none)
      */
+    @Override
     public FlywayCallback[] getCallbacks() {
         return callbacks;
     }
@@ -769,9 +789,6 @@ public class Flyway {
      */
     public void setCallbacks(FlywayCallback... callbacks) {
         this.callbacks = callbacks;
-        for (FlywayCallback flywayCallback : callbacks) {
-            flywayCallback.setFlyway(this);
-        }
     }
 
     /**
@@ -780,7 +797,7 @@ public class Flyway {
      * @param callbacks The fully qualified class names of the callbacks for lifecycle notifications. (default: none)
      */
     public void setCallbacks(String... callbacks) {
-        List<FlywayCallback> callbackList = ClassUtils.instantiateAll(callbacks, classLoader);
+        List<FlywayCallback> callbackList = InjectionUtils.instantiateAll(callbacks, classLoader, this);
         setCallbacks(callbackList.toArray(new FlywayCallback[callbacks.length]));
     }
 
@@ -799,8 +816,8 @@ public class Flyway {
      * @param resolvers The fully qualified class names of the custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
     public void setResolvers(String... resolvers) {
-        List<MigrationResolver> resolverList = ClassUtils.instantiateAll(resolvers, classLoader);
-        this.resolvers = resolverList.toArray(new MigrationResolver[resolvers.length]);
+        List<MigrationResolver> resolverList = InjectionUtils.instantiateAll(resolvers, classLoader, this);
+        setResolvers(resolverList.toArray(new MigrationResolver[resolvers.length]));
     }
 
     /**
@@ -1007,10 +1024,7 @@ public class Flyway {
      * @return A new, fully configured, MigrationResolver instance.
      */
     private MigrationResolver createMigrationResolver(DbSupport dbSupport) {
-        PlaceholderReplacer placeholderReplacer =
-                new PlaceholderReplacer(placeholders, placeholderPrefix, placeholderSuffix);
-        return new CompositeMigrationResolver(dbSupport, classLoader, locations,
-                encoding, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix, placeholderReplacer, resolvers);
+        return new CompositeMigrationResolver(dbSupport, this);
     }
 
     /**

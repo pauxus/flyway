@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import java.sql.Connection;
 
 import org.flywaydb.core.api.callback.FlywayCallback;
+import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.MigrationInfo;
 
 /**
@@ -31,7 +32,7 @@ import org.flywaydb.core.api.MigrationInfo;
  */
 public class FlywayCallbackImpl implements FlywayCallback {
 
-    private Flyway flyway;
+    private FlywayConfiguration flyway;
 	private boolean beforeClean = false;
 	private boolean afterClean = false;
 	private boolean beforeMigrate = false;
@@ -192,10 +193,4 @@ public class FlywayCallbackImpl implements FlywayCallback {
 	public boolean isFlywaySet() {
 	    return flyway != null;
 	}
-
-	@Override
-	public void setFlyway(Flyway flyway) {
-	    this.flyway = flyway;
-	}
-
 }

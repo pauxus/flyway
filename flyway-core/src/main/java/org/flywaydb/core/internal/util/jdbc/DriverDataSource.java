@@ -182,7 +182,7 @@ public class DriverDataSource implements DataSource {
         if (url.startsWith("jdbc:vertica:")) {
             return "com.vertica.jdbc.Driver";
         }
-        
+
         return null;
     }
 
