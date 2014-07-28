@@ -68,7 +68,7 @@ public class InjectionUtils {
                 try {
                     instances.add((T) instantiateAndInjectConfiguration(clazz, classLoader, config));
                 } catch (Exception e) {
-                    throw new FlywayException("Unable to instantiate class: " + clazz);
+                    throw new FlywayException("Unable to instantiate class: " + clazz, e);
                 }
             }
         }
