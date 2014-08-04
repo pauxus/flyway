@@ -24,12 +24,12 @@ import org.flywaydb.core.internal.resolver.jdbc.dummy.Version3dot5;
 import org.flywaydb.core.internal.util.Location;
 import org.junit.Test;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 /**
  * Test for JdbcMigrationResolver.
@@ -42,7 +42,7 @@ public class JdbcMigrationResolverSmallTest {
     }
 
     @Test
-    public void resolveMigrations() {
+    public void resolveMigrations() throws Exception {
         FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader());
         JdbcMigrationResolver jdbcMigrationResolver =
                 new JdbcMigrationResolver(config, new Location("org/flywaydb/core/internal/resolver/jdbc/dummy"));
@@ -56,6 +56,10 @@ public class JdbcMigrationResolverSmallTest {
         assertEquals("2", migrationInfo.getVersion().toString());
         assertEquals("InterfaceBasedMigration", migrationInfo.getDescription());
         assertNull(migrationInfo.getChecksum());
+
+        // do a test execute, since the migration does not do anything, we simply test whether the
+        // configuration has been set correctly
+        migrationInfo.getExecutor().execute(null);
 
         ResolvedMigration migrationInfo1 = migrationList.get(1);
         assertEquals("3.5", migrationInfo1.getVersion().toString());

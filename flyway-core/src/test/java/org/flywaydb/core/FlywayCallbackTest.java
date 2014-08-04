@@ -38,6 +38,9 @@ public class FlywayCallbackTest {
 
         assertNotNull(flyway.getDataSource());
 
+        assertEquals(1, flyway.getCallbacks().length);
+        assertTrue(((FlywayCallbackImpl) flyway.getCallbacks()[0]).isFlywayConfigurationSet());
+
         flyway.clean();
     }
 
@@ -51,8 +54,6 @@ public class FlywayCallbackTest {
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
-
-        assertTrue(callbackImpl.isFlywaySet());
 
         assertNotNull(flyway.getDataSource());
 

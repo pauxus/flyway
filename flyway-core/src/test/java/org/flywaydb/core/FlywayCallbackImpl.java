@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import java.sql.Connection;
 
 import org.flywaydb.core.api.callback.FlywayCallback;
+import org.flywaydb.core.api.ConfigurationAware;
 import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.MigrationInfo;
 
@@ -30,9 +31,9 @@ import org.flywaydb.core.api.MigrationInfo;
  * @author Dan Bunker
  *
  */
-public class FlywayCallbackImpl implements FlywayCallback {
+public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 
-    private FlywayConfiguration flyway;
+    private FlywayConfiguration flywayConfiguration;
 	private boolean beforeClean = false;
 	private boolean afterClean = false;
 	private boolean beforeMigrate = false;
@@ -134,6 +135,11 @@ public class FlywayCallbackImpl implements FlywayCallback {
         assertNotNull(dataConnection);
 	}
 
+	@Override
+	public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
+        this.flywayConfiguration = flywayConfiguration;
+	}
+
 	public boolean isBeforeClean() {
 		return beforeClean;
 	}
@@ -190,7 +196,7 @@ public class FlywayCallbackImpl implements FlywayCallback {
 		return afterInfo;
 	}
 
-	public boolean isFlywaySet() {
-	    return flyway != null;
+	public boolean isFlywayConfigurationSet() {
+	    return flywayConfiguration != null;
 	}
 }
