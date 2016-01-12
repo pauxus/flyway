@@ -16,10 +16,7 @@
 package org.flywaydb.core;
 
 
-import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.FlywayException;
-import org.flywaydb.core.api.MigrationInfoService;
-import org.flywaydb.core.api.MigrationVersion;
+import org.flywaydb.core.api.*;
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.internal.callback.SqlScriptFlywayCallback;
@@ -848,7 +845,14 @@ public class Flyway implements FlywayConfiguration {
      * @param callbacks The callbacks for lifecycle notifications. (default: none)
      */
     public void setCallbacks(FlywayCallback... callbacks) {
+        injectConfiguration(callbacks);
         this.callbacks = callbacks;
+    }
+
+    private void injectConfiguration(Object[] objects) {
+        for (Object object : objects) {
+            InjectionUtils.injectFlywayConfiguration(object, this);
+        }
     }
 
     /**
@@ -857,7 +861,7 @@ public class Flyway implements FlywayConfiguration {
      * @param callbacks The fully qualified class names of the callbacks for lifecycle notifications. (default: none)
      */
     public void setCallbacksAsClassNames(String... callbacks) {
-        List<FlywayCallback> callbackList = InjectionUtils.instantiateAll(callbacks, classLoader, this);
+        List<FlywayCallback> callbackList = ClassUtils.instantiateAll(callbacks, classLoader);
         setCallbacks(callbackList.toArray(new FlywayCallback[callbacks.length]));
     }
 
@@ -867,6 +871,7 @@ public class Flyway implements FlywayConfiguration {
      * @param resolvers The custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
     public void setResolvers(MigrationResolver... resolvers) {
+        injectConfiguration(resolvers);
         this.resolvers = resolvers;
     }
 
@@ -876,7 +881,7 @@ public class Flyway implements FlywayConfiguration {
      * @param resolvers The fully qualified class names of the custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
     public void setResolversAsClassNames(String... resolvers) {
-        List<MigrationResolver> resolverList = InjectionUtils.instantiateAll(resolvers, classLoader, this);
+        List<MigrationResolver> resolverList = ClassUtils.instantiateAll(resolvers, classLoader);
         setResolvers(resolverList.toArray(new MigrationResolver[resolvers.length]));
     }
 
@@ -1089,10 +1094,9 @@ public class Flyway implements FlywayConfiguration {
      * Creates the MigrationResolver.
      *
      * @param dbSupport The database-specific support.
-     * @param scanner   The Scanner for resolving migrations.
      * @return A new, fully configured, MigrationResolver instance.
      */
-    private MigrationResolver createMigrationResolver(DbSupport dbSupport, Scanner scanner) {
+    private MigrationResolver createMigrationResolver(DbSupport dbSupport) {
         return new CompositeMigrationResolver(dbSupport, this);
     }
 
@@ -1297,8 +1301,7 @@ public class Flyway implements FlywayConfiguration {
                 schemas[i] = dbSupport.getSchema(schemaNames[i]);
             }
 
-            Scanner scanner = new Scanner(classLoader);
-            MigrationResolver migrationResolver = createMigrationResolver(dbSupport, scanner);
+            MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
 
             if (callbacks.length == 0) {
                 setCallbacks(new SqlScriptFlywayCallback(dbSupport, scanner, locations, createPlaceholderReplacer(),

@@ -50,29 +50,4 @@ public class InjectionUtils {
         injectFlywayConfiguration(result, config);
         return result;
     }
-
-    /**
-     * Instantiate all these classes and injects FlywayConfiguration if needed.
-     *
-     * @param classes     A fully qualified class names to instantiate.
-     * @param classLoader The ClassLoader to use.
-     * @param <T>         The common type for all classes.
-     * @param config      The configuration to inject.
-     * @return The list of instances.
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> List<T> instantiateAll(String[] classes, ClassLoader classLoader, FlywayConfiguration config) {
-        List<T> instances = new ArrayList<T>();
-        for (String clazz : classes) {
-            if (StringUtils.hasLength(clazz)) {
-                try {
-                    instances.add((T) instantiateAndInjectConfiguration(clazz, classLoader, config));
-                } catch (Exception e) {
-                    throw new FlywayException("Unable to instantiate class: " + clazz, e);
-                }
-            }
-        }
-        return instances;
-    }
-
 }

@@ -39,6 +39,8 @@ public class FlywayCallbackSmallTest {
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
 
+        assertTrue(((FlywayCallbackImpl) flyway.getCallbacks()[0]).isFlywayConfigurationSet());
+
         assertNotNull(flyway.getDataSource());
 
         assertFalse(callbackImpl.isBeforeClean());
