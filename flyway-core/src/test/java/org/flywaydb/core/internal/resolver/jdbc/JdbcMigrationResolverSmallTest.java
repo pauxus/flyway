@@ -37,20 +37,17 @@ import static org.junit.Assert.assertNull;
  * Test for JdbcMigrationResolver.
  */
 public class JdbcMigrationResolverSmallTest {
-    private final Scanner scanner = new Scanner(Thread.currentThread().getContextClassLoader());
+    private final FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader());
 
     @Test(expected = FlywayException.class)
     public void broken() {
-        FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader());
         new JdbcMigrationResolver(config, new Location("org/flywaydb/core/internal/resolver/jdbc/error")).resolveMigrations();
-        new JdbcMigrationResolver(scanner, new Location("org/flywaydb/core/internal/resolver/jdbc/error")).resolveMigrations();
     }
 
     @Test
     public void resolveMigrations() throws Exception {
-        FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader());
         JdbcMigrationResolver jdbcMigrationResolver =
-                new JdbcMigrationResolver(scanner, new Location("org/flywaydb/core/internal/resolver/jdbc/dummy"));
+                new JdbcMigrationResolver(config, new Location("org/flywaydb/core/internal/resolver/jdbc/dummy"));
         Collection<ResolvedMigration> migrations = jdbcMigrationResolver.resolveMigrations();
 
         assertEquals(3, migrations.size());
@@ -77,7 +74,7 @@ public class JdbcMigrationResolverSmallTest {
 
     @Test
     public void conventionOverConfiguration() {
-        JdbcMigrationResolver jdbcMigrationResolver = new JdbcMigrationResolver(scanner, null);
+        JdbcMigrationResolver jdbcMigrationResolver = new JdbcMigrationResolver(config, null);
         ResolvedMigration migrationInfo = jdbcMigrationResolver.extractMigrationInfo(new V2__InterfaceBasedMigration());
         assertEquals("2", migrationInfo.getVersion().toString());
         assertEquals("InterfaceBasedMigration", migrationInfo.getDescription());
@@ -86,7 +83,7 @@ public class JdbcMigrationResolverSmallTest {
 
     @Test
     public void explicitInfo() {
-        JdbcMigrationResolver jdbcMigrationResolver = new JdbcMigrationResolver(scanner, null);
+        JdbcMigrationResolver jdbcMigrationResolver = new JdbcMigrationResolver(config, null);
         ResolvedMigration migrationInfo = jdbcMigrationResolver.extractMigrationInfo(new Version3dot5());
         assertEquals("3.5", migrationInfo.getVersion().toString());
         assertEquals("Three Dot Five", migrationInfo.getDescription());

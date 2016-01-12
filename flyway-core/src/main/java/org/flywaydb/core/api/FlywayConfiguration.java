@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import javax.sql.DataSource;
 
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
+import org.flywaydb.core.internal.util.scanner.Scanner;
 
 /**
  * Readonly interface for main flyway configuration. Can be used to provide configuration data to migrations and callbacks.
@@ -33,11 +34,11 @@ public interface FlywayConfiguration {
 
     DataSource getDataSource();
 
+    MigrationVersion getBaselineVersion();
+
+    String getBaselineDescription();
+
     MigrationResolver[] getResolvers();
-
-    String getInitDescription();
-
-    MigrationVersion getInitVersion();
 
     String getSqlMigrationSuffix();
 
@@ -61,4 +62,5 @@ public interface FlywayConfiguration {
 
     String[] getLocations();
 
+    Scanner getScanner();
 }

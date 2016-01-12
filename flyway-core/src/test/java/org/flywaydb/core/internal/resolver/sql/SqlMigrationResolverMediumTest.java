@@ -43,9 +43,8 @@ public class SqlMigrationResolverMediumTest {
 
         FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader(), new String[0], "UTF-8", "V", "__", ".sql");
         SqlMigrationResolver sqlMigrationResolver =
-                new SqlMigrationResolver(null, new Scanner(Thread.currentThread().getContextClassLoader()),
-                        new Location("filesystem:" + new File(path).getPath()), PlaceholderReplacer.NO_PLACEHOLDERS,
-                        "UTF-8", "V", "__", ".sql");
+                new SqlMigrationResolver(null, config,
+                        new Location("filesystem:" + new File(path).getPath()), PlaceholderReplacer.NO_PLACEHOLDERS);
         Collection<ResolvedMigration> migrations = sqlMigrationResolver.resolveMigrations();
 
         assertEquals(3, migrations.size());

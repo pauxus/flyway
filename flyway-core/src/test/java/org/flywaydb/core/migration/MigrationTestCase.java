@@ -226,19 +226,10 @@ public abstract class MigrationTestCase {
      */
     private void assertChecksum(MigrationInfo migrationInfo) {
         FlywayConfiguration config = new FlywayConfigurationForTests(Thread.currentThread().getContextClassLoader(), new String[0], "UTF-8", "V", "__", ".sql");
-        // TODO: Adapt
-        /*
-                        dbSupport, config,
-                new Location(BASEDIR),
-                PlaceholderReplacer.NO_PLACEHOLDERS);
-
-        */
         SqlMigrationResolver sqlMigrationResolver = new SqlMigrationResolver(
-                dbSupport, new Scanner(Thread.currentThread().getContextClassLoader()),
+                dbSupport, config,
                 new Location(getBasedir()),
-                PlaceholderReplacer.NO_PLACEHOLDERS,
-                "UTF-8",
-                "V", "__", ".sql");
+                PlaceholderReplacer.NO_PLACEHOLDERS);
         List<ResolvedMigration> migrations = sqlMigrationResolver.resolveMigrations();
         for (ResolvedMigration migration : migrations) {
             if (migration.getVersion().toString().equals(migrationInfo.getVersion().toString())) {

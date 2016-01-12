@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.internal.util.Locations;
+import org.flywaydb.core.internal.util.scanner.Scanner;
 
 /**
  * Dummy Implementation of {@link FlywayConfiguration} for unit tests.
@@ -37,21 +38,24 @@ public class FlywayConfigurationForTests implements FlywayConfiguration {
     private String sqlMigrationSeparator;
     private String sqlMigrationSuffix;
     private MyCustomMigrationResolver[] migrationResolvers;
+    private Scanner scanner;
 
     public FlywayConfigurationForTests(ClassLoader contextClassLoader, String[] locations, String encoding,
             String sqlMigrationPrefix, String sqlMigrationSeparator, String sqlMigrationSuffix,
             MyCustomMigrationResolver... myCustomMigrationResolver) {
-                this.classLoader = contextClassLoader;
-                this.locations = locations;
-                this.encoding = encoding;
-                this.sqlMigrationPrefix = sqlMigrationPrefix;
-                this.sqlMigrationSeparator = sqlMigrationSeparator;
-                this.sqlMigrationSuffix = sqlMigrationSuffix;
-                this.migrationResolvers = myCustomMigrationResolver;
+        this.classLoader = contextClassLoader;
+        this.locations = locations;
+        this.encoding = encoding;
+        this.sqlMigrationPrefix = sqlMigrationPrefix;
+        this.sqlMigrationSeparator = sqlMigrationSeparator;
+        this.sqlMigrationSuffix = sqlMigrationSuffix;
+        this.migrationResolvers = myCustomMigrationResolver;
+        this.scanner = new Scanner(classLoader);
     }
 
     public FlywayConfigurationForTests(ClassLoader contextClassLoader) {
         classLoader = contextClassLoader;
+        this.scanner = new Scanner(classLoader);
     }
 
     @Override
@@ -75,13 +79,13 @@ public class FlywayConfigurationForTests implements FlywayConfiguration {
     }
 
     @Override
-    public String getInitDescription() {
+    public String getBaselineDescription() {
         // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public MigrationVersion getInitVersion() {
+    public MigrationVersion getBaselineVersion() {
         // TODO Auto-generated method stub
         return null;
     }
@@ -140,6 +144,11 @@ public class FlywayConfigurationForTests implements FlywayConfiguration {
     @Override
     public String[] getLocations() {
         return this.locations;
+    }
+
+    @Override
+    public Scanner getScanner() {
+        return scanner;
     }
 
     @Override

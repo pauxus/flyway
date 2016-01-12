@@ -249,6 +249,11 @@ public class Flyway implements FlywayConfiguration {
     private ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 
     /**
+     * The Scanner to search the classpath.
+     */
+    private Scanner scanner = new Scanner(classLoader);
+
+    /**
      * Whether the database connection info has already been printed in the logs.
      */
     private boolean dbConnectionInfoPrinted;
@@ -532,6 +537,15 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
+     * Retrieves the Scanner instance used to scan the classpath.
+     * @return The Scanner instance used to scan the classpath.
+     */
+    @Override
+    public Scanner getScanner() {
+        return scanner;
+    }
+
+    /**
      * Ignores failed future migrations when reading the metadata table. These are migrations that were performed by a
      * newer deployment of the application that are not yet available in this version. For example: we have migrations
      * available on the classpath up to version 3.0. The metadata table indicates that a migration to version 4.0
@@ -757,6 +771,7 @@ public class Flyway implements FlywayConfiguration {
      */
     public void setClassLoader(ClassLoader classLoader) {
         this.classLoader = classLoader;
+        this.scanner = new Scanner(classLoader);
     }
 
     /**
@@ -1079,9 +1094,7 @@ public class Flyway implements FlywayConfiguration {
      */
     // TODO: adapt
     private MigrationResolver createMigrationResolver(DbSupport dbSupport, Scanner scanner) {
-        return new CompositeMigrationResolver(dbSupport, scanner, locations,
-                encoding, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix, createPlaceholderReplacer(),
-                resolvers);
+        return new CompositeMigrationResolver(dbSupport, this);
     }
 
     /**
