@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,18 @@ public class OracleSqlStatementBuilderSmallTest {
     }
 
     @Test
+    public void javaSource() {
+        builder.addLine("CREATE OR REPLACE AND COMPILE JAVA SOURCE NAMED \"JavaTest\" AS");
+        assertFalse(builder.isTerminated());
+        builder.addLine("public class JavaTest {");
+        assertFalse(builder.isTerminated());
+        builder.addLine("};");
+        assertFalse(builder.isTerminated());
+        builder.addLine("/");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
     public void nvarchar() {
         builder.addLine("INSERT INTO nvarchar2_test VALUES ( N'qwerty' );");
         assertTrue(builder.isTerminated());
@@ -41,6 +53,30 @@ public class OracleSqlStatementBuilderSmallTest {
     @Test
     public void notNvarchar() {
         builder.addLine("INSERT INTO nvarchar2_test VALUES ( ' N' );");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void qQuote() {
+        builder.addLine("select q'[Hello 'no quotes]' from dual;");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void quotedStringEndingWithN() {
+        builder.addLine("insert into table (COLUMN) values 'VALUE_WITH_N';");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void quotedWithFrom() {
+        builder.addLine("insert into table (COLUMN) values 'FROM';");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void quotedWithFromComplex() {
+        builder.addLine("DELETE FROM TEST.TABLE1 where CFG_AREA_ID_1 like '%NAME%' AND SOME_ID='NITS'AND CFG_AREA_CD IN ('COND_TXT','FORM');");
         assertTrue(builder.isTerminated());
     }
 }

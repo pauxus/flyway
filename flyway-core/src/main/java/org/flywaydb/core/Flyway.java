@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,13 @@ import org.flywaydb.core.api.MigrationInfoService;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
-import org.flywaydb.core.internal.command.*;
+import org.flywaydb.core.internal.callback.SqlScriptFlywayCallback;
+import org.flywaydb.core.internal.command.DbBaseline;
+import org.flywaydb.core.internal.command.DbClean;
+import org.flywaydb.core.internal.command.DbMigrate;
+import org.flywaydb.core.internal.command.DbRepair;
+import org.flywaydb.core.internal.command.DbSchemas;
+import org.flywaydb.core.internal.command.DbValidate;
 import org.flywaydb.core.internal.dbsupport.DbSupport;
 import org.flywaydb.core.internal.dbsupport.DbSupportFactory;
 import org.flywaydb.core.internal.dbsupport.Schema;
@@ -35,20 +41,30 @@ import org.flywaydb.core.internal.util.InjectionUtils;
 import org.flywaydb.core.internal.util.Locations;
 import org.flywaydb.core.internal.util.PlaceholderReplacer;
 import org.flywaydb.core.internal.util.StringUtils;
+import org.flywaydb.core.internal.util.VersionPrinter;
 import org.flywaydb.core.internal.util.jdbc.DriverDataSource;
 import org.flywaydb.core.internal.util.jdbc.JdbcUtils;
+import org.flywaydb.core.internal.util.jdbc.TransactionCallback;
+import org.flywaydb.core.internal.util.jdbc.TransactionTemplate;
 import org.flywaydb.core.internal.util.logging.Log;
 import org.flywaydb.core.internal.util.logging.LogFactory;
+import org.flywaydb.core.internal.util.scanner.Scanner;
 
 import javax.sql.DataSource;
-
 import java.sql.Connection;
-import java.util.*;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * This is the centre point of Flyway, and for most users, the only class they will ever have to deal with.
- * <p/>
+ * <p>
  * It is THE public API from which all important Flyway functions such as clean, validate and migrate can be called.
+ * </p>
  */
 public class Flyway implements FlywayConfiguration {
     private static final Log LOG = LogFactory.getLog(Flyway.class);
@@ -96,10 +112,15 @@ public class Flyway implements FlywayConfiguration {
     private String table = "schema_version";
 
     /**
-     * The target version up to which Flyway should run migrations. Migrations with a higher version number will not be
-     * applied. (default: the latest version)
+     * The target version up to which Flyway should consider migrations. Migrations with a higher version number will
+     * be ignored. The special value {@code current} designates the current version of the schema (default: the latest version)
      */
     private MigrationVersion target = MigrationVersion.LATEST;
+
+    /**
+     * Whether placeholders should be replaced. (default: true)
+     */
+    private boolean placeholderReplacement = true;
 
     /**
      * The map of &lt;placeholder, replacementValue&gt; to apply to sql migration scripts.
@@ -157,7 +178,7 @@ public class Flyway implements FlywayConfiguration {
     private boolean validateOnMigrate = true;
 
     /**
-     * Whether to automatically call clean or not when a validation error occurs. (default: {@code false})<br/>
+     * Whether to automatically call clean or not when a validation error occurs. (default: {@code false})
      * <p> This is exclusively intended as a convenience for development. Even tough we
      * strongly recommend not to change migration scripts once they have been checked into SCM and run, this provides a
      * way of dealing with this case in a smooth manner. The database will be wiped clean automatically, ensuring that
@@ -167,20 +188,20 @@ public class Flyway implements FlywayConfiguration {
     private boolean cleanOnValidationError;
 
     /**
-     * The version to tag an existing schema with when executing init. (default: 1)
+     * The version to tag an existing schema with when executing baseline. (default: 1)
      */
-    private MigrationVersion initVersion = MigrationVersion.fromVersion("1");
+    private MigrationVersion baselineVersion = MigrationVersion.fromVersion("1");
 
     /**
-     * The description to tag an existing schema with when executing init. (default: << Flyway Init >>)
+     * The description to tag an existing schema with when executing baseline. (default: &lt;&lt; Flyway Baseline &gt;&gt;)
      */
-    private String initDescription = "<< Flyway Init >>";
+    private String baselineDescription = "<< Flyway Baseline >>";
 
     /**
      * <p>
-     * Whether to automatically call init when migrate is executed against a non-empty schema with no metadata table.
-     * This schema will then be initialized with the {@code initVersion} before executing the migrations.
-     * Only migrations above {@code initVersion} will then be applied.
+     * Whether to automatically call baseline when migrate is executed against a non-empty schema with no metadata table.
+     * This schema will then be initialized with the {@code baselineVersion} before executing the migrations.
+     * Only migrations above {@code baselineVersion} will then be applied.
      * </p>
      * <p>
      * This is useful for initial Flyway production deployments on projects with an existing DB.
@@ -190,7 +211,7 @@ public class Flyway implements FlywayConfiguration {
      * Flyway does not migrate the wrong database in case of a configuration mistake! (default: {@code false})
      * </p>
      */
-    private boolean initOnMigrate;
+    private boolean baselineOnMigrate;
 
     /**
      * Allows migrations to be run "out of order".
@@ -299,15 +320,24 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Retrieves the target version up to which Flyway should run migrations. Migrations with a higher version number
-     * will not be applied.
+     * Retrieves the target version up to which Flyway should consider migrations.
+     * Migrations with a higher version number will be ignored.
+     * The special value {@code current} designates the current version of the schema.
      *
-     * @return The target version up to which Flyway should run migrations. Migrations with a higher version number will
-     * not be applied. (default: the latest version)
+     * @return The target version up to which Flyway should consider migrations. (default: the latest version)
      */
     @Override
     public MigrationVersion getTarget() {
         return target;
+    }
+
+    /**
+     * Checks whether placeholders should be replaced.
+     *
+     * @return Whether placeholders should be replaced. (default: true)
+     */
+    public boolean isPlaceholderReplacement() {
+        return placeholderReplacement;
     }
 
     /**
@@ -405,7 +435,7 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Whether to automatically call clean or not when a validation error occurs.<br/>
+     * Whether to automatically call clean or not when a validation error occurs.
      * <p> This is exclusively intended as a convenience for development. Even tough we
      * strongly recommend not to change migration scripts once they have been checked into SCM and run, this provides a
      * way of dealing with this case in a smooth manner. The database will be wiped clean automatically, ensuring that
@@ -419,30 +449,30 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Retrieves the version to tag an existing schema with when executing init.
+     * Retrieves the version to tag an existing schema with when executing baseline.
      *
-     * @return The version to tag an existing schema with when executing init. (default: 1)
+     * @return The version to tag an existing schema with when executing baseline. (default: 1)
      */
     @Override
-    public MigrationVersion getInitVersion() {
-        return initVersion;
+    public MigrationVersion getBaselineVersion() {
+        return baselineVersion;
     }
 
     /**
-     * Retrieves the description to tag an existing schema with when executing init.
+     * Retrieves the description to tag an existing schema with when executing baseline.
      *
-     * @return The description to tag an existing schema with when executing init. (default: << Flyway Init >>)
+     * @return The description to tag an existing schema with when executing baseline. (default: &lt;&lt; Flyway Baseline &gt;&gt;)
      */
     @Override
-    public String getInitDescription() {
-        return initDescription;
+    public String getBaselineDescription() {
+        return baselineDescription;
     }
 
     /**
      * <p>
-     * Whether to automatically call init when migrate is executed against a non-empty schema with no metadata table.
-     * This schema will then be initialized with the {@code initVersion} before executing the migrations.
-     * Only migrations above {@code initVersion} will then be applied.
+     * Whether to automatically call baseline when migrate is executed against a non-empty schema with no metadata table.
+     * This schema will then be initialized with the {@code baselineVersion} before executing the migrations.
+     * Only migrations above {@code baselineVersion} will then be applied.
      * </p>
      * <p>
      * This is useful for initial Flyway production deployments on projects with an existing DB.
@@ -452,10 +482,10 @@ public class Flyway implements FlywayConfiguration {
      * Flyway does not migrate the wrong database in case of a configuration mistake!
      * </p>
      *
-     * @return {@code true} if init should be called on migrate for non-empty schemas, {@code false} if not. (default: {@code false})
+     * @return {@code true} if baseline should be called on migrate for non-empty schemas, {@code false} if not. (default: {@code false})
      */
-    public boolean isInitOnMigrate() {
-        return initOnMigrate;
+    public boolean isBaselineOnMigrate() {
+        return baselineOnMigrate;
     }
 
     /**
@@ -527,7 +557,7 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Whether to automatically call clean or not when a validation error occurs.<br/>
+     * Whether to automatically call clean or not when a validation error occurs.
      * <p> This is exclusively intended as a convenience for development. Even tough we
      * strongly recommend not to change migration scripts once they have been checked into SCM and run, this provides a
      * way of dealing with this case in a smooth manner. The database will be wiped clean automatically, ensuring that
@@ -592,25 +622,34 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Sets the target version up to which Flyway should run migrations. Migrations with a higher version number will
-     * not be applied.
+     * Sets the target version up to which Flyway should consider migrations. Migrations with a higher version number will
+     * be ignored.
      *
-     * @param target The target version up to which Flyway should run migrations. Migrations with a higher version
-     *               number will not be applied. (default: the latest version)
+     * @param target The target version up to which Flyway should consider migrations. (default: the latest version)
      */
     public void setTarget(MigrationVersion target) {
         this.target = target;
     }
 
     /**
-     * Sets the target version up to which Flyway should run migrations. Migrations with a higher version number will
-     * not be applied.
+     * Sets the target version up to which Flyway should consider migrations.
+     * Migrations with a higher version number will be ignored.
      *
-     * @param target The target version up to which Flyway should run migrations. Migrations with a higher version
-     *               number will not be applied. (default: the latest version)
+     * @param target The target version up to which Flyway should consider migrations.
+     *               The special value {@code current} designates the current version of the schema. (default: the latest
+     *               version)
      */
-    public void setTarget(String target) {
+    public void setTargetAsString(String target) {
         this.target = MigrationVersion.fromVersion(target);
+    }
+
+    /**
+     * Sets whether placeholders should be replaced.
+     *
+     * @param placeholderReplacement Whether placeholders should be replaced. (default: true)
+     */
+    public void setPlaceholderReplacement(boolean placeholderReplacement) {
+        this.placeholderReplacement = placeholderReplacement;
     }
 
     /**
@@ -628,6 +667,9 @@ public class Flyway implements FlywayConfiguration {
      * @param placeholderPrefix The prefix of every placeholder. (default: ${ )
      */
     public void setPlaceholderPrefix(String placeholderPrefix) {
+        if (!StringUtils.hasLength(placeholderPrefix)) {
+            throw new FlywayException("placeholderPrefix cannot be empty!");
+        }
         this.placeholderPrefix = placeholderPrefix;
     }
 
@@ -637,6 +679,9 @@ public class Flyway implements FlywayConfiguration {
      * @param placeholderSuffix The suffix of every placeholder. (default: } )
      */
     public void setPlaceholderSuffix(String placeholderSuffix) {
+        if (!StringUtils.hasLength(placeholderSuffix)) {
+            throw new FlywayException("placeholderSuffix cannot be empty!");
+        }
         this.placeholderSuffix = placeholderSuffix;
     }
 
@@ -715,37 +760,37 @@ public class Flyway implements FlywayConfiguration {
     }
 
     /**
-     * Sets the version to tag an existing schema with when executing init.
+     * Sets the version to tag an existing schema with when executing baseline.
      *
-     * @param initVersion The version to tag an existing schema with when executing init. (default: 1)
+     * @param baselineVersion The version to tag an existing schema with when executing baseline. (default: 1)
      */
-    public void setInitVersion(MigrationVersion initVersion) {
-        this.initVersion = initVersion;
+    public void setBaselineVersion(MigrationVersion baselineVersion) {
+        this.baselineVersion = baselineVersion;
     }
 
     /**
-     * Sets the version to tag an existing schema with when executing init.
+     * Sets the version to tag an existing schema with when executing baseline.
      *
-     * @param initVersion The version to tag an existing schema with when executing init. (default: 1)
+     * @param baselineVersion The version to tag an existing schema with when executing baseline. (default: 1)
      */
-    public void setInitVersion(String initVersion) {
-        this.initVersion = MigrationVersion.fromVersion(initVersion);
+    public void setBaselineVersionAsString(String baselineVersion) {
+        this.baselineVersion = MigrationVersion.fromVersion(baselineVersion);
     }
 
     /**
-     * Sets the description to tag an existing schema with when executing init.
+     * Sets the description to tag an existing schema with when executing baseline.
      *
-     * @param initDescription The description to tag an existing schema with when executing init. (default: << Flyway Init >>)
+     * @param baselineDescription The description to tag an existing schema with when executing baseline. (default: &lt;&lt; Flyway Baseline &gt;&gt;)
      */
-    public void setInitDescription(String initDescription) {
-        this.initDescription = initDescription;
+    public void setBaselineDescription(String baselineDescription) {
+        this.baselineDescription = baselineDescription;
     }
 
     /**
      * <p>
-     * Whether to automatically call init when migrate is executed against a non-empty schema with no metadata table.
-     * This schema will then be initialized with the {@code initVersion} before executing the migrations.
-     * Only migrations above {@code initVersion} will then be applied.
+     * Whether to automatically call baseline when migrate is executed against a non-empty schema with no metadata table.
+     * This schema will then be baselined with the {@code baselineVersion} before executing the migrations.
+     * Only migrations above {@code baselineVersion} will then be applied.
      * </p>
      * <p>
      * This is useful for initial Flyway production deployments on projects with an existing DB.
@@ -755,10 +800,10 @@ public class Flyway implements FlywayConfiguration {
      * Flyway does not migrate the wrong database in case of a configuration mistake!
      * </p>
      *
-     * @param initOnMigrate {@code true} if init should be called on migrate for non-empty schemas, {@code false} if not. (default: {@code false})
+     * @param baselineOnMigrate {@code true} if baseline should be called on migrate for non-empty schemas, {@code false} if not. (default: {@code false})
      */
-    public void setInitOnMigrate(boolean initOnMigrate) {
-        this.initOnMigrate = initOnMigrate;
+    public void setBaselineOnMigrate(boolean baselineOnMigrate) {
+        this.baselineOnMigrate = baselineOnMigrate;
     }
 
     /**
@@ -796,7 +841,7 @@ public class Flyway implements FlywayConfiguration {
      *
      * @param callbacks The fully qualified class names of the callbacks for lifecycle notifications. (default: none)
      */
-    public void setCallbacks(String... callbacks) {
+    public void setCallbacksAsClassNames(String... callbacks) {
         List<FlywayCallback> callbackList = InjectionUtils.instantiateAll(callbacks, classLoader, this);
         setCallbacks(callbackList.toArray(new FlywayCallback[callbacks.length]));
     }
@@ -815,32 +860,31 @@ public class Flyway implements FlywayConfiguration {
      *
      * @param resolvers The fully qualified class names of the custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
-    public void setResolvers(String... resolvers) {
+    public void setResolversAsClassNames(String... resolvers) {
         List<MigrationResolver> resolverList = InjectionUtils.instantiateAll(resolvers, classLoader, this);
         setResolvers(resolverList.toArray(new MigrationResolver[resolvers.length]));
     }
 
     /**
-     * Starts the database migration. All pending migrations will be applied in order.
-     * Calling migrate on an up-to-date database has no effect.
+     * <p>Starts the database migration. All pending migrations will be applied in order.
+     * Calling migrate on an up-to-date database has no effect.</p>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-migrate.png" alt="migrate">
      *
      * @return The number of successfully applied migrations.
      * @throws FlywayException when the migration failed.
      */
     public int migrate() throws FlywayException {
         return execute(new Command<Integer>() {
-            public Integer execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
+            public Integer execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
 
-                MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
                 if (validateOnMigrate) {
-                    doValidate(connectionMetaDataTable, connectionUserObjects, migrationResolver, metaDataTable,
-                            schemas, true);
+                    doValidate(connectionMetaDataTable, dbSupport, migrationResolver, metaDataTable, schemas, true);
                 }
 
                 new DbSchemas(connectionMetaDataTable, schemas, metaDataTable).create();
 
-                if (!metaDataTable.hasSchemasMarker() && !metaDataTable.hasInitMarker() && !metaDataTable.hasAppliedMigrations()) {
+                if (!metaDataTable.hasSchemasMarker() && !metaDataTable.hasBaselineMarker() && !metaDataTable.hasAppliedMigrations()) {
                     List<Schema> nonEmptySchemas = new ArrayList<Schema>();
                     for (Schema schema : schemas) {
                         if (!schema.empty()) {
@@ -848,9 +892,9 @@ public class Flyway implements FlywayConfiguration {
                         }
                     }
 
-                    if (initOnMigrate || nonEmptySchemas.isEmpty()) {
-                        if (initOnMigrate && !nonEmptySchemas.isEmpty()) {
-                            new DbInit(connectionMetaDataTable, metaDataTable, initVersion, initDescription, callbacks).init();
+                    if (baselineOnMigrate || nonEmptySchemas.isEmpty()) {
+                        if (baselineOnMigrate && !nonEmptySchemas.isEmpty()) {
+                            new DbBaseline(connectionMetaDataTable, dbSupport, metaDataTable, schemas[0], baselineVersion, baselineDescription, callbacks).baseline();
                         }
                     } else {
                         if (nonEmptySchemas.size() == 1) {
@@ -858,52 +902,38 @@ public class Flyway implements FlywayConfiguration {
                             //Check whether we only have an empty metadata table in an otherwise empty schema
                             if (schema.allTables().length != 1 || !schema.getTable(table).exists()) {
                                 throw new FlywayException("Found non-empty schema " + schema
-                                        + " without metadata table! Use init()"
-                                        + " or set initOnMigrate to true to initialize the metadata table.");
+                                        + " without metadata table! Use baseline()"
+                                        + " or set baselineOnMigrate to true to initialize the metadata table.");
                             }
                         } else {
                             throw new FlywayException("Found non-empty schemas "
                                     + StringUtils.collectionToCommaDelimitedString(nonEmptySchemas)
-                                    + " without metadata table! Use init()"
-                                    + " or set initOnMigrate to true to initialize the metadata table.");
+                                    + " without metadata table! Use baseline()"
+                                    + " or set baselineOnMigrate to true to initialize the metadata table.");
                         }
                     }
-                }
-
-                DbSupport dbSupportUserObjects = DbSupportFactory.createDbSupport(connectionUserObjects, false);
-                Schema originalSchemaUserObjects = dbSupportUserObjects.getCurrentSchema();
-                boolean schemaChange = !schemas[0].equals(originalSchemaUserObjects);
-                if (schemaChange) {
-                    dbSupportUserObjects.setCurrentSchema(schemas[0]);
                 }
 
                 DbMigrate dbMigrate =
                         new DbMigrate(connectionMetaDataTable, connectionUserObjects, dbSupport, metaDataTable,
                                 schemas[0], migrationResolver, target, ignoreFailedFutureMigration, outOfOrder, callbacks);
-                try {
-                    return dbMigrate.migrate();
-                } finally {
-                    if (schemaChange) {
-                        dbSupportUserObjects.setCurrentSchema(originalSchemaUserObjects);
-                    }
-                }
+                return dbMigrate.migrate();
             }
         });
     }
 
     /**
-     * Validate applied migration with classpath migrations to detect accidental changes.
+     * <p>Validate applied migration with classpath migrations to detect accidental changes.</p>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-validate.png" alt="validate">
      *
      * @throws FlywayException when the validation failed.
      */
     public void validate() throws FlywayException {
         execute(new Command<Void>() {
-            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
+            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
-                MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
 
-                doValidate(connectionMetaDataTable, connectionUserObjects, migrationResolver, metaDataTable, schemas,
-                        false);
+                doValidate(connectionMetaDataTable, dbSupport, migrationResolver, metaDataTable, schemas, false);
                 return null;
             }
         });
@@ -913,85 +943,108 @@ public class Flyway implements FlywayConfiguration {
      * Performs the actual validation. All set up must have taken place beforehand.
      *
      * @param connectionMetaDataTable The database connection for the metadata table.
-     * @param connectionUserObjects   The database connection for the data.
+     * @param dbSupport               The database-specific support.
      * @param migrationResolver       The migration resolver;
      * @param metaDataTable           The metadata table.
      * @param schemas                 The schemas managed by Flyway.
-     * @param pending                 Whether pending migrations are ok.
+     * @param pendingOrFuture         Whether pending or future migrations are ok.
      */
-    private void doValidate(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver,
-                            MetaDataTable metaDataTable, Schema[] schemas, boolean pending) {
+    private void doValidate(Connection connectionMetaDataTable, DbSupport dbSupport, MigrationResolver migrationResolver,
+                            MetaDataTable metaDataTable, Schema[] schemas, boolean pendingOrFuture) {
         String validationError =
-                new DbValidate(connectionMetaDataTable, connectionUserObjects, metaDataTable, migrationResolver,
-                        target, outOfOrder, pending, callbacks).validate();
+                new DbValidate(connectionMetaDataTable, dbSupport, metaDataTable, schemas[0], migrationResolver,
+                        target, outOfOrder, pendingOrFuture, callbacks).validate();
 
         if (validationError != null) {
             if (cleanOnValidationError) {
-                new DbClean(connectionMetaDataTable, metaDataTable, schemas, callbacks).clean();
+                new DbClean(connectionMetaDataTable, dbSupport, metaDataTable, schemas, callbacks).clean();
             } else {
-                throw new FlywayException("Validate failed. Found differences between applied migrations and available migrations: " + validationError);
+                throw new FlywayException("Validate failed. " + validationError);
             }
         }
     }
 
     /**
-     * Drops all objects (tables, views, procedures, triggers, ...) in the configured schemas.
-     * The schemas are cleaned in the order specified by the {@code schemas} property.
+     * <p>Drops all objects (tables, views, procedures, triggers, ...) in the configured schemas.
+     * The schemas are cleaned in the order specified by the {@code schemas} property.</p>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-clean.png" alt="clean">
      *
      * @throws FlywayException when the clean fails.
      */
     public void clean() {
         execute(new Command<Void>() {
-            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
+            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 MetaDataTableImpl metaDataTable =
                         new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
-                new DbClean(connectionMetaDataTable, metaDataTable, schemas, callbacks).clean();
+                new DbClean(connectionMetaDataTable, dbSupport, metaDataTable, schemas, callbacks).clean();
                 return null;
             }
         });
     }
 
     /**
-     * Retrieves the complete information about all the migrations including applied, pending and current migrations with
-     * details and status.
+     * <p>Retrieves the complete information about all the migrations including applied, pending and current migrations with
+     * details and status.</p>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-info.png" alt="info">
      *
      * @return All migrations sorted by version, oldest first.
      * @throws FlywayException when the info retrieval failed.
      */
     public MigrationInfoService info() {
         return execute(new Command<MigrationInfoService>() {
-            public MigrationInfoService execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
-                for (FlywayCallback callback : getCallbacks()) {
-                    callback.beforeInfo(connectionUserObjects);
+            public MigrationInfoService execute(final Connection connectionMetaDataTable, Connection connectionUserObjects,
+                                                MigrationResolver migrationResolver, final DbSupport dbSupport, final Schema[] schemas) {
+                try {
+                    for (final FlywayCallback callback : getCallbacks()) {
+                        new TransactionTemplate(connectionMetaDataTable).execute(new TransactionCallback<Object>() {
+                            @Override
+                            public Object doInTransaction() throws SQLException {
+                                dbSupport.changeCurrentSchemaTo(schemas[0]);
+                                callback.beforeInfo(connectionMetaDataTable);
+                                return null;
+                            }
+                        });
+                    }
+
+                    dbSupport.changeCurrentSchemaTo(schemas[0]);
+                    MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
+
+                    MigrationInfoServiceImpl migrationInfoService =
+                            new MigrationInfoServiceImpl(migrationResolver, metaDataTable, target, outOfOrder, true);
+                    migrationInfoService.refresh();
+
+                    for (final FlywayCallback callback : getCallbacks()) {
+                        new TransactionTemplate(connectionMetaDataTable).execute(new TransactionCallback<Object>() {
+                            @Override
+                            public Object doInTransaction() throws SQLException {
+                                dbSupport.changeCurrentSchemaTo(schemas[0]);
+                                callback.afterInfo(connectionMetaDataTable);
+                                return null;
+                            }
+                        });
+                    }
+
+                    return migrationInfoService;
+                } finally {
+                    dbSupport.restoreCurrentSchema();
                 }
-
-                MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
-                MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
-
-                MigrationInfoServiceImpl migrationInfoService =
-                        new MigrationInfoServiceImpl(migrationResolver, metaDataTable, target, outOfOrder, true);
-                migrationInfoService.refresh();
-
-                for (FlywayCallback callback : getCallbacks()) {
-                    callback.afterInfo(connectionUserObjects);
-                }
-
-                return migrationInfoService;
             }
         });
     }
 
     /**
-     * Creates and initializes the Flyway metadata table.
+     * <p>Baselines an existing database, excluding all migrations up to and including baselineVersion.</p>
+     * <p/>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-baseline.png" alt="baseline">
      *
-     * @throws FlywayException when the schema initialization failed.
+     * @throws FlywayException when the schema baselining failed.
      */
-    public void init() throws FlywayException {
+    public void baseline() throws FlywayException {
         execute(new Command<Void>() {
-            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
+            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
                 new DbSchemas(connectionMetaDataTable, schemas, metaDataTable).create();
-                new DbInit(connectionMetaDataTable, metaDataTable, initVersion, initDescription, callbacks).init();
+                new DbBaseline(connectionMetaDataTable, dbSupport, metaDataTable, schemas[0], baselineVersion, baselineDescription, callbacks).baseline();
                 return null;
             }
         });
@@ -1000,18 +1053,18 @@ public class Flyway implements FlywayConfiguration {
     /**
      * Repairs the Flyway metadata table. This will perform the following actions:
      * <ul>
-     *     <li>Remove any failed migrations on databases without DDL transactions (User objects left behind must still be cleaned up manually)</li>
-     *     <li>Correct wrong checksums</li>
+     * <li>Remove any failed migrations on databases without DDL transactions (User objects left behind must still be cleaned up manually)</li>
+     * <li>Correct wrong checksums</li>
      * </ul>
+     * <img src="http://flywaydb.org/assets/balsamiq/command-repair.png" alt="repair">
      *
      * @throws FlywayException when the metadata table repair failed.
      */
     public void repair() throws FlywayException {
         execute(new Command<Void>() {
-            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
-                MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
+            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 MetaDataTable metaDataTable = new MetaDataTableImpl(dbSupport, schemas[0].getTable(table));
-                new DbRepair(dbSupport, connectionMetaDataTable, migrationResolver, metaDataTable, callbacks).repair();
+                new DbRepair(dbSupport, connectionMetaDataTable, schemas[0], migrationResolver, metaDataTable, callbacks).repair();
                 return null;
             }
         });
@@ -1021,10 +1074,25 @@ public class Flyway implements FlywayConfiguration {
      * Creates the MigrationResolver.
      *
      * @param dbSupport The database-specific support.
+     * @param scanner   The Scanner for resolving migrations.
      * @return A new, fully configured, MigrationResolver instance.
      */
-    private MigrationResolver createMigrationResolver(DbSupport dbSupport) {
-        return new CompositeMigrationResolver(dbSupport, this);
+    // TODO: adapt
+    private MigrationResolver createMigrationResolver(DbSupport dbSupport, Scanner scanner) {
+        return new CompositeMigrationResolver(dbSupport, scanner, locations,
+                encoding, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix, createPlaceholderReplacer(),
+                resolvers);
+    }
+
+    /**
+     * @return A new, fully configured, PlaceholderReplacer.
+     */
+    // TODO: Adapt?
+    private PlaceholderReplacer createPlaceholderReplacer() {
+        if (placeholderReplacement) {
+            return new PlaceholderReplacer(placeholders, placeholderPrefix, placeholderSuffix);
+        }
+        return PlaceholderReplacer.NO_PLACEHOLDERS;
     }
 
     /**
@@ -1038,10 +1106,15 @@ public class Flyway implements FlywayConfiguration {
      */
     @SuppressWarnings("ConstantConditions")
     public void configure(Properties properties) {
-        String driverProp = properties.getProperty("flyway.driver");
-        String urlProp = properties.getProperty("flyway.url");
-        String userProp = properties.getProperty("flyway.user");
-        String passwordProp = properties.getProperty("flyway.password");
+        Map<String, String> props = new HashMap<String, String>();
+        for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+            props.put(entry.getKey().toString(), entry.getValue().toString());
+        }
+
+        String driverProp = getValueAndRemoveEntry(props, "flyway.driver");
+        String urlProp = getValueAndRemoveEntry(props, "flyway.url");
+        String userProp = getValueAndRemoveEntry(props, "flyway.user");
+        String passwordProp = getValueAndRemoveEntry(props, "flyway.password");
 
         if (StringUtils.hasText(urlProp)) {
             setDataSource(new DriverDataSource(classLoader, driverProp, urlProp, userProp, passwordProp));
@@ -1050,94 +1123,117 @@ public class Flyway implements FlywayConfiguration {
             LOG.warn("Discarding INCOMPLETE dataSource configuration! flyway.url must be set.");
         }
 
-        String locationsProp = properties.getProperty("flyway.locations");
+        String locationsProp = getValueAndRemoveEntry(props, "flyway.locations");
         if (locationsProp != null) {
             setLocations(StringUtils.tokenizeToStringArray(locationsProp, ","));
         }
-        String placeholderPrefixProp = properties.getProperty("flyway.placeholderPrefix");
+        String placeholderPrefixProp = getValueAndRemoveEntry(props, "flyway.placeholderPrefix");
         if (placeholderPrefixProp != null) {
             setPlaceholderPrefix(placeholderPrefixProp);
         }
-        String placeholderSuffixProp = properties.getProperty("flyway.placeholderSuffix");
+        String placeholderSuffixProp = getValueAndRemoveEntry(props, "flyway.placeholderSuffix");
         if (placeholderSuffixProp != null) {
             setPlaceholderSuffix(placeholderSuffixProp);
         }
-        String sqlMigrationPrefixProp = properties.getProperty("flyway.sqlMigrationPrefix");
+        String sqlMigrationPrefixProp = getValueAndRemoveEntry(props, "flyway.sqlMigrationPrefix");
         if (sqlMigrationPrefixProp != null) {
             setSqlMigrationPrefix(sqlMigrationPrefixProp);
         }
-        String sqlMigrationSeparatorProp = properties.getProperty("flyway.sqlMigrationSeparator");
+        String sqlMigrationSeparatorProp = getValueAndRemoveEntry(props, "flyway.sqlMigrationSeparator");
         if (sqlMigrationSeparatorProp != null) {
             setSqlMigrationSeparator(sqlMigrationSeparatorProp);
         }
-        String sqlMigrationSuffixProp = properties.getProperty("flyway.sqlMigrationSuffix");
+        String sqlMigrationSuffixProp = getValueAndRemoveEntry(props, "flyway.sqlMigrationSuffix");
         if (sqlMigrationSuffixProp != null) {
             setSqlMigrationSuffix(sqlMigrationSuffixProp);
         }
-        String encodingProp = properties.getProperty("flyway.encoding");
+        String encodingProp = getValueAndRemoveEntry(props, "flyway.encoding");
         if (encodingProp != null) {
             setEncoding(encodingProp);
         }
-        String schemasProp = properties.getProperty("flyway.schemas");
+        String schemasProp = getValueAndRemoveEntry(props, "flyway.schemas");
         if (schemasProp != null) {
             setSchemas(StringUtils.tokenizeToStringArray(schemasProp, ","));
         }
-        String tableProp = properties.getProperty("flyway.table");
+        String tableProp = getValueAndRemoveEntry(props, "flyway.table");
         if (tableProp != null) {
             setTable(tableProp);
         }
-        String cleanOnValidationErrorProp = properties.getProperty("flyway.cleanOnValidationError");
+        String cleanOnValidationErrorProp = getValueAndRemoveEntry(props, "flyway.cleanOnValidationError");
         if (cleanOnValidationErrorProp != null) {
             setCleanOnValidationError(Boolean.parseBoolean(cleanOnValidationErrorProp));
         }
-        String validateOnMigrateProp = properties.getProperty("flyway.validateOnMigrate");
+        String validateOnMigrateProp = getValueAndRemoveEntry(props, "flyway.validateOnMigrate");
         if (validateOnMigrateProp != null) {
             setValidateOnMigrate(Boolean.parseBoolean(validateOnMigrateProp));
         }
-        String initVersionProp = properties.getProperty("flyway.initVersion");
-        if (initVersionProp != null) {
-            setInitVersion(MigrationVersion.fromVersion(initVersionProp));
+        String baselineVersionProp = getValueAndRemoveEntry(props, "flyway.baselineVersion");
+        if (baselineVersionProp != null) {
+            setBaselineVersion(MigrationVersion.fromVersion(baselineVersionProp));
         }
-        String initDescriptionProp = properties.getProperty("flyway.initDescription");
-        if (initDescriptionProp != null) {
-            setInitDescription(initDescriptionProp);
+        String baselineDescriptionProp = getValueAndRemoveEntry(props, "flyway.baselineDescription");
+        if (baselineDescriptionProp != null) {
+            setBaselineDescription(baselineDescriptionProp);
         }
-        String initOnMigrateProp = properties.getProperty("flyway.initOnMigrate");
-        if (initOnMigrateProp != null) {
-            setInitOnMigrate(Boolean.parseBoolean(initOnMigrateProp));
+        String baselineOnMigrateProp = getValueAndRemoveEntry(props, "flyway.baselineOnMigrate");
+        if (baselineOnMigrateProp != null) {
+            setBaselineOnMigrate(Boolean.parseBoolean(baselineOnMigrateProp));
         }
-        String ignoreFailedFutureMigrationProp = properties.getProperty("flyway.ignoreFailedFutureMigration");
+        String ignoreFailedFutureMigrationProp = getValueAndRemoveEntry(props, "flyway.ignoreFailedFutureMigration");
         if (ignoreFailedFutureMigrationProp != null) {
             setIgnoreFailedFutureMigration(Boolean.parseBoolean(ignoreFailedFutureMigrationProp));
         }
-        String targetProp = properties.getProperty("flyway.target");
+        String targetProp = getValueAndRemoveEntry(props, "flyway.target");
         if (targetProp != null) {
             setTarget(MigrationVersion.fromVersion(targetProp));
         }
-        String outOfOrderProp = properties.getProperty("flyway.outOfOrder");
+        String outOfOrderProp = getValueAndRemoveEntry(props, "flyway.outOfOrder");
         if (outOfOrderProp != null) {
             setOutOfOrder(Boolean.parseBoolean(outOfOrderProp));
         }
-        String resolversProp = properties.getProperty("flyway.resolvers");
+        String resolversProp = getValueAndRemoveEntry(props, "flyway.resolvers");
         if (StringUtils.hasLength(resolversProp)) {
-            setResolvers(StringUtils.tokenizeToStringArray(resolversProp, ","));
+            setResolversAsClassNames(StringUtils.tokenizeToStringArray(resolversProp, ","));
         }
-        String callbacksProp = properties.getProperty("flyway.callbacks");
+        String callbacksProp = getValueAndRemoveEntry(props, "flyway.callbacks");
         if (StringUtils.hasLength(callbacksProp)) {
-            setCallbacks(StringUtils.tokenizeToStringArray(callbacksProp, ","));
+            setCallbacksAsClassNames(StringUtils.tokenizeToStringArray(callbacksProp, ","));
         }
 
         Map<String, String> placeholdersFromProps = new HashMap<String, String>(placeholders);
-        for (Object property : properties.keySet()) {
-            String propertyName = (String) property;
+        Iterator<Map.Entry<String, String>> iterator = props.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, String> entry = iterator.next();
+            String propertyName = entry.getKey();
+
             if (propertyName.startsWith(PLACEHOLDERS_PROPERTY_PREFIX)
                     && propertyName.length() > PLACEHOLDERS_PROPERTY_PREFIX.length()) {
                 String placeholderName = propertyName.substring(PLACEHOLDERS_PROPERTY_PREFIX.length());
-                String placeholderValue = properties.getProperty(propertyName);
+                String placeholderValue = entry.getValue();
                 placeholdersFromProps.put(placeholderName, placeholderValue);
+                iterator.remove();
             }
         }
         setPlaceholders(placeholdersFromProps);
+
+        for (String key : props.keySet()) {
+            if (key.startsWith("flyway.")) {
+                LOG.warn("Unknown configuration property: " + key);
+            }
+        }
+    }
+
+    /**
+     * Retrieves the value for this key in this map and removes the corresponding entry from the map.
+     *
+     * @param map The map.
+     * @param key The key.
+     * @return The value. {@code null} if not found.
+     */
+    private String getValueAndRemoveEntry(Map<String, String> map, String key) {
+        String value = map.get(key);
+        map.remove(key);
+        return value;
     }
 
     /**
@@ -1150,12 +1246,16 @@ public class Flyway implements FlywayConfiguration {
     /*private -> testing*/ <T> T execute(Command<T> command) {
         T result;
 
+        VersionPrinter.printVersion();
+
         Connection connectionMetaDataTable = null;
         Connection connectionUserObjects = null;
 
+        boolean callbackAutoAdded = false;
+
         try {
             if (dataSource == null) {
-                throw new FlywayException("DataSource not set! Check your configuration!");
+                throw new FlywayException("Unable to connect to the database. Configure the url, user and password!");
             }
 
             connectionMetaDataTable = JdbcUtils.openConnection(dataSource);
@@ -1166,7 +1266,7 @@ public class Flyway implements FlywayConfiguration {
             LOG.debug("DDL Transactions Supported: " + dbSupport.supportsDdlTransactions());
 
             if (schemaNames.length == 0) {
-                Schema currentSchema = dbSupport.getCurrentSchema();
+                Schema currentSchema = dbSupport.getOriginalSchema();
                 if (currentSchema == null) {
                     throw new FlywayException("Unable to determine schema for the metadata table." +
                             " Set a default schema for the connection or specify one using the schemas property!");
@@ -1185,8 +1285,21 @@ public class Flyway implements FlywayConfiguration {
                 schemas[i] = dbSupport.getSchema(schemaNames[i]);
             }
 
-            result = command.execute(connectionMetaDataTable, connectionUserObjects, dbSupport, schemas);
+            Scanner scanner = new Scanner(classLoader);
+            MigrationResolver migrationResolver = createMigrationResolver(dbSupport, scanner);
+
+            if (callbacks.length == 0) {
+                setCallbacks(new SqlScriptFlywayCallback(dbSupport, scanner, locations, createPlaceholderReplacer(),
+                        encoding, sqlMigrationSuffix));
+                callbackAutoAdded = true;
+            }
+
+            result = command.execute(connectionMetaDataTable, connectionUserObjects, migrationResolver, dbSupport, schemas);
         } finally {
+            if (callbackAutoAdded) {
+                setCallbacksAsClassNames();
+            }
+
             JdbcUtils.closeConnection(connectionUserObjects);
             JdbcUtils.closeConnection(connectionMetaDataTable);
 
@@ -1208,10 +1321,10 @@ public class Flyway implements FlywayConfiguration {
          *
          * @param connectionMetaDataTable The database connection for the metadata table changes.
          * @param connectionUserObjects   The database connection for user object changes.
-         * @param dbSupport               The database-specific support for these connections.
-         * @param schemas                 The schemas managed by Flyway.
-         * @return The result of the operation.
+         * @param migrationResolver
+         *@param dbSupport               The database-specific support for these connections.
+         * @param schemas                 The schemas managed by Flyway.   @return The result of the operation.
          */
-        T execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas);
+        T execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas);
     }
 }

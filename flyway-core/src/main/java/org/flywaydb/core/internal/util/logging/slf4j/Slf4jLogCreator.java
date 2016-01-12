@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ package org.flywaydb.core.internal.util.logging.slf4j;
 
 import org.flywaydb.core.internal.util.logging.Log;
 import org.flywaydb.core.internal.util.logging.LogCreator;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
 
 /**
- * Log Creator for Apache Commons Logging.
+ * Log Creator for Slf4j.
  */
 public class Slf4jLogCreator implements LogCreator {
     public Log createLogger(Class<?> clazz) {
-        return new Slf4jLog(LogFactory.getLog(clazz));
+        return new Slf4jLog(LoggerFactory.getLogger(clazz));
     }
 }

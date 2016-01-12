@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ public class SqlMigrationResolver implements MigrationResolver {
      * Creates a new instance.
      *
      * @param dbSupport             The database-specific support.
-     * @param classLoader           The ClassLoader for loading migrations on the classpath.
+     * @param scanner               The Scanner for loading migrations on the classpath.
      * @param location              The location on the classpath where to migrations are located.
      * @param placeholderReplacer   The placeholder replacer to apply to sql migration scripts.
      * @param encoding              The encoding of Sql migrations.
@@ -95,7 +95,7 @@ public class SqlMigrationResolver implements MigrationResolver {
      */
     public SqlMigrationResolver(DbSupport dbSupport, FlywayConfiguration config, Location location, PlaceholderReplacer placeholderReplacer) {
         this.dbSupport = dbSupport;
-        this.scanner = new Scanner(config.getClassLoader());
+        this.scanner = config.getScanner();
         this.location = location;
         this.placeholderReplacer = placeholderReplacer;
         this.encoding = config.getEncoding();
@@ -107,19 +107,13 @@ public class SqlMigrationResolver implements MigrationResolver {
     public List<ResolvedMigration> resolveMigrations() {
         List<ResolvedMigration> migrations = new ArrayList<ResolvedMigration>();
 
-        Resource[] resources;
-        try {
-            resources = scanner.scanForResources(location, sqlMigrationPrefix, sqlMigrationSuffix);
+        Resource[] resources = scanner.scanForResources(location, sqlMigrationPrefix, sqlMigrationSuffix);
+        for (Resource resource : resources) {
+            ResolvedMigrationImpl resolvedMigration = extractMigrationInfo(resource);
+            resolvedMigration.setPhysicalLocation(resource.getLocationOnDisk());
+            resolvedMigration.setExecutor(new SqlMigrationExecutor(dbSupport, resource, placeholderReplacer, encoding));
 
-            for (Resource resource : resources) {
-                ResolvedMigrationImpl resolvedMigration = extractMigrationInfo(resource);
-                resolvedMigration.setPhysicalLocation(resource.getLocationOnDisk());
-                resolvedMigration.setExecutor(new SqlMigrationExecutor(dbSupport, resource, placeholderReplacer, encoding));
-
-                migrations.add(resolvedMigration);
-            }
-        } catch (Exception e) {
-            throw new FlywayException("Unable to scan for SQL migrations in location: " + location, e);
+            migrations.add(resolvedMigration);
         }
 
         Collections.sort(migrations, new ResolvedMigrationComparator());

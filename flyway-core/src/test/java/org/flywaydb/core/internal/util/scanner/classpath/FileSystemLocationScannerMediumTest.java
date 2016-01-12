@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.flywaydb.core.internal.util.scanner.classpath;
 
+import org.flywaydb.core.internal.util.UrlUtils;
 import org.junit.Test;
 
 import java.io.File;
@@ -31,15 +32,14 @@ public class FileSystemLocationScannerMediumTest {
     @Test
     public void findResourceNamesFromFileSystem() throws Exception {
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        String url = classLoader.getResources("migration").nextElement().getFile();
-        String path = URLDecoder.decode(url, "UTF-8") + "/";
+        String path = UrlUtils.toFilePath(classLoader.getResources("migration").nextElement()) + File.separator;
 
         Set<String> resourceNames =
-                new FileSystemClassPathLocationScanner().findResourceNamesFromFileSystem(path, "sql", new File(path + "sql"));
+                new FileSystemClassPathLocationScanner().findResourceNamesFromFileSystem(path, "sql", new File(path, "sql"));
 
         assertEquals(4, resourceNames.size());
         String[] names = resourceNames.toArray(new String[4]);
-        assertEquals("sql/V1_1__View.sql", names[0]);
+        assertEquals("sql/V1.1__View.sql", names[0]);
         assertEquals("sql/V1_2__Populate_table.sql", names[1]);
         assertEquals("sql/V1__First.sql", names[2]);
         assertEquals("sql/V2_0__Add_foreign_key_and_super_mega_humongous_padding_to_exceed_the_maximum_column_length_in_the_metadata_table.sql", names[3]);

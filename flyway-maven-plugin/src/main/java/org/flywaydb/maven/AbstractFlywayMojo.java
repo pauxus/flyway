@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,29 +128,29 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
     private String table = flyway.getTable();
 
     /**
-     * The version to tag an existing schema with when executing init. (default: 1)<br/>
-     * <p>Also configurable with Maven or System Property: ${flyway.initVersion}</p>
+     * The version to tag an existing schema with when executing baseline. (default: 1)<br/>
+     * <p>Also configurable with Maven or System Property: ${flyway.baselineVersion}</p>
      *
-     * @parameter property="flyway.initVersion"
+     * @parameter property="flyway.baselineVersion"
      */
-    private String initVersion = flyway.getInitVersion().getVersion();
+    private String baselineVersion;
 
     /**
-     * The description to tag an existing schema with when executing init. (default: << Flyway Init >>)<br>
-     * <p>Also configurable with Maven or System Property: ${flyway.initDescription}</p>
+     * The description to tag an existing schema with when executing baseline. (default: << Flyway Baseline >>)<br>
+     * <p>Also configurable with Maven or System Property: ${flyway.baselineDescription}</p>
      *
-     * @parameter property="flyway.initDescription"
+     * @parameter property="flyway.baselineDescription"
      */
-    private String initDescription = flyway.getInitDescription();
+    private String baselineDescription;
 
     /**
      * Locations on the classpath to scan recursively for migrations. Locations may contain both sql
-     * and java-based migrations. (default: db/migration)
+     * and java-based migrations. (default: filesystem:src/main/resources/db/migration)
      * <p>Also configurable with Maven or System Property: ${flyway.locations} (Comma-separated list)</p>
      *
      * @parameter
      */
-    private String[] locations = flyway.getLocations();
+    private String[] locations;
 
     /**
      * The fully qualified class names of the custom MigrationResolvers to be used in addition to the built-in ones for
@@ -217,8 +217,9 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
     private boolean cleanOnValidationError = flyway.isCleanOnValidationError();
 
     /**
-     * The target version up to which Flyway should run migrations. Migrations with a higher version number will not be
-     * applied. (default: the latest version)
+     * The target version up to which Flyway should consider migrations.
+     * Migrations with a higher version number will be ignored.
+     * The special value {@code current} designates the current version of the schema. (default: the latest version)
      * <p>Also configurable with Maven or System Property: ${flyway.target}</p>
      *
      * @parameter property="flyway.target"
@@ -248,6 +249,14 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
      * @parameter property="flyway.ignoreFailedFutureMigration"
      */
     private boolean ignoreFailedFutureMigration = flyway.isIgnoreFailedFutureMigration();
+
+    /**
+     * Whether placeholders should be replaced. (default: true)<br>
+     * <p>Also configurable with Maven or System Property: ${flyway.placeholderReplacement}</p>
+     *
+     * @parameter property="flyway.placeholderReplacement"
+     */
+    private boolean placeholderReplacement = flyway.isPlaceholderReplacement();
 
     /**
      * A map of &lt;placeholder, replacementValue&gt; to apply to sql migration scripts.
@@ -284,8 +293,8 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
 
     /**
      * <p>
-     * Whether to automatically call init when migrate is executed against a non-empty schema with no metadata table.
-     * This schema will then be initialized with the {@code initialVersion} before executing the migrations.
+     * Whether to automatically call baseline when migrate is executed against a non-empty schema with no metadata table.
+     * This schema will then be baselined with the {@code initialVersion} before executing the migrations.
      * Only migrations above {@code initialVersion} will then be applied.
      * </p>
      * <p>
@@ -295,11 +304,11 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
      * Be careful when enabling this as it removes the safety net that ensures
      * Flyway does not migrate the wrong database in case of a configuration mistake! (default: {@code false})
      * </p>
-     * <p>Also configurable with Maven or System Property: ${flyway.initOnMigrate}</p>
+     * <p>Also configurable with Maven or System Property: ${flyway.baselineOnMigrate}</p>
      *
-     * @parameter property="flyway.initOnMigrate"
+     * @parameter property="flyway.baselineOnMigrate"
      */
-    private boolean initOnMigrate = flyway.isInitOnMigrate();
+    private Boolean baselineOnMigrate;
 
     /**
      * Whether to automatically call validate or not when running migrate. (default: {@code true})<br/>
@@ -363,7 +372,7 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
                 } catch (SecDispatcherException e) {
                     throw new FlywayException("Unable to decrypt password", e);
                 } catch (PlexusCipherException e) {
-                    throw new FlywayException("Unable to initialized password decryption", e);
+                    throw new FlywayException("Unable to initialize password decryption", e);
                 }
             }
         }
@@ -399,8 +408,12 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
             flyway.setClassLoader(Thread.currentThread().getContextClassLoader());
             flyway.setSchemas(schemas);
             flyway.setTable(table);
-            flyway.setInitVersion(initVersion);
-            flyway.setInitDescription(initDescription);
+            if (baselineVersion != null) {
+                flyway.setBaselineVersionAsString(baselineVersion);
+            }
+            if (baselineDescription != null) {
+                flyway.setBaselineDescription(baselineDescription);
+            }
             if (locations != null) {
                 for (int i = 0; i < locations.length; i++) {
                     if (locations[i].startsWith(Location.FILESYSTEM_PREFIX)) {
@@ -413,20 +426,26 @@ abstract class AbstractFlywayMojo extends AbstractMojo {
                     }
                 }
                 flyway.setLocations(locations);
+            } else {
+                locations = new String[] { Location.FILESYSTEM_PREFIX + mavenProject.getBasedir().getAbsolutePath() + "/src/main/resources/db/migration"};
             }
-            flyway.setResolvers(resolvers);
-            flyway.setCallbacks(callbacks);
+            flyway.setResolversAsClassNames(resolvers);
+            flyway.setCallbacksAsClassNames(callbacks);
             flyway.setEncoding(encoding);
             flyway.setSqlMigrationPrefix(sqlMigrationPrefix);
             flyway.setSqlMigrationSeparator(sqlMigrationSeparator);
             flyway.setSqlMigrationSuffix(sqlMigrationSuffix);
             flyway.setCleanOnValidationError(cleanOnValidationError);
             flyway.setOutOfOrder(outOfOrder);
-            flyway.setTarget(target);
+            flyway.setTargetAsString(target);
             flyway.setIgnoreFailedFutureMigration(ignoreFailedFutureMigration);
+            flyway.setPlaceholderReplacement(placeholderReplacement);
             flyway.setPlaceholderPrefix(placeholderPrefix);
+            flyway.setPlaceholderSuffix(placeholderSuffix);
 
-            flyway.setInitOnMigrate(initOnMigrate);
+            if (baselineOnMigrate != null) {
+                flyway.setBaselineOnMigrate(baselineOnMigrate);
+            }
             flyway.setValidateOnMigrate(validateOnMigrate);
 
             Properties properties = new Properties();

@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,6 +65,20 @@ public class PostgreSQLSchema extends Schema<PostgreSQLDbSupport> {
 
     @Override
     protected void doClean() throws SQLException {
+        int databaseMajorVersion = jdbcTemplate.getMetaData().getDatabaseMajorVersion();
+        int databaseMinorVersion = jdbcTemplate.getMetaData().getDatabaseMinorVersion();
+
+        if ((databaseMajorVersion > 9) || ((databaseMajorVersion == 9) && (databaseMinorVersion >= 3))) {
+            // PostgreSQL 9.3 and newer only
+            for (String statement : generateDropStatementsForMaterializedViews()) {
+                jdbcTemplate.execute(statement);
+            }
+        }
+
+        for (String statement : generateDropStatementsForViews()) {
+            jdbcTemplate.execute(statement);
+        }
+
         for (Table table : allTables()) {
             table.drop();
         }
@@ -230,6 +244,45 @@ public class PostgreSQLSchema extends Schema<PostgreSQLDbSupport> {
         return statements;
     }
 
+    /**
+     * Generates the statements for dropping the materialized views in this schema.
+     *
+     * @return The drop statements.
+     * @throws SQLException when the clean statements could not be generated.
+     */
+    private List<String> generateDropStatementsForMaterializedViews() throws SQLException {
+        List<String> viewNames =
+                jdbcTemplate.queryForStringList(
+                        "SELECT relname FROM pg_catalog.pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                                + " WHERE c.relkind = 'm' AND n.nspname = ?", name);
+
+        List<String> statements = new ArrayList<String>();
+        for (String domainName : viewNames) {
+            statements.add("DROP MATERIALIZED VIEW IF EXISTS " + dbSupport.quote(name, domainName) + " CASCADE");
+        }
+
+        return statements;
+    }
+
+    /**
+     * Generates the statements for dropping the views in this schema.
+     *
+     * @return The drop statements.
+     * @throws SQLException when the clean statements could not be generated.
+     */
+    private List<String> generateDropStatementsForViews() throws SQLException {
+        List<String> viewNames =
+                jdbcTemplate.queryForStringList(
+                        "SELECT table_name FROM information_schema.views WHERE table_schema=?", name);
+
+        List<String> statements = new ArrayList<String>();
+        for (String domainName : viewNames) {
+            statements.add("DROP VIEW IF EXISTS " + dbSupport.quote(name, domainName) + " CASCADE");
+        }
+
+        return statements;
+    }
+
     @Override
     protected Table[] doAllTables() throws SQLException {
         List<String> tableNames =
@@ -242,7 +295,7 @@ public class PostgreSQLSchema extends Schema<PostgreSQLDbSupport> {
                                 " AND table_type='BASE TABLE'" +
                                 //and are not child tables (= do not inherit from another table).
                                 " AND NOT (SELECT EXISTS (SELECT inhrelid FROM pg_catalog.pg_inherits" +
-                                " WHERE inhrelid = ('\"'||t.table_schema||'\".\"'||t.table_name||'\"')::regclass::oid))",
+                                " WHERE inhrelid = (quote_ident(t.table_schema)||'.'||quote_ident(t.table_name))::regclass::oid))",
                         name
                 );
         //Views and child tables are excluded as they are dropped with the parent table when using cascade.

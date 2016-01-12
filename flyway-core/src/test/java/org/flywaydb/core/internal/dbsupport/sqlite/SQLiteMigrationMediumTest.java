@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ public class SQLiteMigrationMediumTest extends MigrationTestCase {
 
     @Test
     public void noDriverCrashIssue746() throws Exception {
-        flyway.setLocations(BASEDIR);
+        flyway.setLocations(getBasedir());
 
         Properties props = new Properties();
         //uncomment this to fix the code

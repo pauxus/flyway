@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,9 +31,11 @@ import static org.junit.Assert.assertEquals;
  */
 @Category(DbCategory.DB2.class)
 public class DB2MigrationMediumTest extends MigrationTestCase {
+    private String user;
+
     @Override
     protected DataSource createDataSource(Properties customProperties) throws Exception {
-        String user = customProperties.getProperty("db2.user", "db2admin");
+        user = customProperties.getProperty("db2.user", "db2admin");
         String password = customProperties.getProperty("db2.password", "flyway");
         String url = customProperties.getProperty("db2.url", "jdbc:db2://localhost:50000/flyway");
 
@@ -57,6 +59,14 @@ public class DB2MigrationMediumTest extends MigrationTestCase {
 
         flyway.clean();
         flyway.migrate();
+    }
+
+    @Test
+    public void bitdata() throws Exception {
+        flyway.setLocations("migration/dbsupport/db2/sql/bitdata");
+        flyway.migrate();
+
+        assertEquals("1", flyway.info().current().getVersion().toString());
     }
 
     @Test
@@ -124,6 +134,15 @@ public class DB2MigrationMediumTest extends MigrationTestCase {
     }
 
     @Test
+    public void expressionBasedIndex() throws Exception {
+        flyway.setLocations("migration/dbsupport/db2/sql/index");
+        flyway.migrate();
+
+        flyway.clean();
+        flyway.migrate();
+    }
+
+    @Test
     public void versioned() throws Exception {
         flyway.setLocations("migration/dbsupport/db2/sql/versioned");
         flyway.migrate();
@@ -131,4 +150,16 @@ public class DB2MigrationMediumTest extends MigrationTestCase {
         flyway.clean();
         flyway.migrate();
     }
+
+    // Issue #802: Clean on DB2 does not clean triggers.
+    @Test
+    public void noTriggersShouldBeLeftAfterClean() throws Exception {
+        flyway.setLocations("migration/dbsupport/db2/sql/trigger");
+        flyway.migrate();
+        flyway.clean();
+
+        // default schema is username in upper case, so we need to use that.
+        assertEquals(0, jdbcTemplate.queryForInt("SELECT COUNT(*) FROM SYSCAT.TRIGGERS WHERE TRIGSCHEMA = ?", user.toUpperCase()));
+    }
+
 }

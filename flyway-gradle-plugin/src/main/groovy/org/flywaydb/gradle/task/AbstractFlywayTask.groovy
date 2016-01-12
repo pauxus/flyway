@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.flywaydb.gradle.task
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.callback.FlywayCallback
 import org.flywaydb.core.api.FlywayException
+import org.flywaydb.core.internal.util.Location
 import org.flywaydb.core.internal.util.StringUtils
 import org.flywaydb.core.internal.util.jdbc.DriverDataSource
 import org.flywaydb.gradle.FlywayExtension
@@ -26,9 +27,6 @@ import org.gradle.api.tasks.TaskAction
 
 /**
  * A base class for all flyway tasks.
- *
- * @author Ben Manes (ben.manes@gmail.com)
- * @author Allan Morstein (alkamo@gmail.com)
  */
 abstract class AbstractFlywayTask extends DefaultTask {
     /**
@@ -39,15 +37,10 @@ abstract class AbstractFlywayTask extends DefaultTask {
     /**
      * The flyway {} block in the build script.
      */
-    private FlywayExtension extension
+    protected FlywayExtension extension
 
     AbstractFlywayTask() {
         group = 'Flyway'
-        project.afterEvaluate {
-            if (isJavaProject()) {
-                this.dependsOn(project.tasks.testClasses)
-            }
-        }
         extension = project.flyway
     }
 
@@ -87,19 +80,30 @@ abstract class AbstractFlywayTask extends DefaultTask {
         flyway.setDataSource(new DriverDataSource(Thread.currentThread().getContextClassLoader(), prop("driver"), prop("url"), prop("user"), prop("password")))
 
         propSet(flyway, 'table')
-        propSet(flyway, 'initVersion')
-        propSet(flyway, 'initDescription')
+
+        String baselineVersion = prop('baselineVersion')
+        if (baselineVersion != null) {
+            flyway.setBaselineVersionAsString(baselineVersion)
+        }
+
+        propSet(flyway, 'baselineDescription')
         propSet(flyway, 'sqlMigrationPrefix')
         propSet(flyway, 'sqlMigrationSeparator')
         propSet(flyway, 'sqlMigrationSuffix')
         propSet(flyway, 'encoding')
+        propSetAsBoolean(flyway, 'placeholderReplacement')
         propSet(flyway, 'placeholderPrefix')
         propSet(flyway, 'placeholderSuffix')
-        propSet(flyway, 'target')
+
+        String target = prop('target')
+        if (target != null) {
+            flyway.setTargetAsString(target)
+        }
+
         propSetAsBoolean(flyway, 'outOfOrder')
         propSetAsBoolean(flyway, 'validateOnMigrate')
         propSetAsBoolean(flyway, 'cleanOnValidationError')
-        propSetAsBoolean(flyway, 'initOnMigrate')
+        propSetAsBoolean(flyway, 'baselineOnMigrate')
 
         def sysSchemas = System.getProperty("flyway.schemas")
         if (sysSchemas != null) {
@@ -110,6 +114,7 @@ abstract class AbstractFlywayTask extends DefaultTask {
             flyway.schemas = extension.schemas
         }
 
+        flyway.setLocations(Location.FILESYSTEM_PREFIX + project.projectDir + '/src/main/resources/db/migration')
         def sysLocations = System.getProperty("flyway.locations")
         if (sysLocations != null) {
             flyway.locations = StringUtils.tokenizeToStringArray(sysLocations, ",")
@@ -121,11 +126,11 @@ abstract class AbstractFlywayTask extends DefaultTask {
 
         def sysResolvers = System.getProperty("flyway.resolvers")
         if (sysResolvers != null) {
-            flyway.setResolvers(StringUtils.tokenizeToStringArray(sysResolvers, ","))
+            flyway.setResolversAsClassNames(StringUtils.tokenizeToStringArray(sysResolvers, ","))
         } else if (project.hasProperty("flyway.resolvers")) {
-            flyway.setResolvers(StringUtils.tokenizeToStringArray(project["flyway.resolvers"].toString(), ","))
+            flyway.setResolversAsClassNames(StringUtils.tokenizeToStringArray(project["flyway.resolvers"].toString(), ","))
         } else if (extension.resolvers != null) {
-            flyway.setResolvers(extension.resolvers)
+            flyway.setResolversAsClassNames(extension.resolvers)
         }
 
         Map<String, String> placeholders = [:]
@@ -148,11 +153,11 @@ abstract class AbstractFlywayTask extends DefaultTask {
 
         def sysCallbacks = System.getProperty("flyway.callbacks")
         if (sysCallbacks != null) {
-            flyway.setCallbacks(StringUtils.tokenizeToStringArray(sysCallbacks, ","))
+            flyway.setCallbacksAsClassNames(StringUtils.tokenizeToStringArray(sysCallbacks, ","))
         } else if (project.hasProperty("flyway.callbacks")) {
-            flyway.setCallbacks(StringUtils.tokenizeToStringArray(project["flyway.callbacks"].toString(), ","))
+            flyway.setCallbacksAsClassNames(StringUtils.tokenizeToStringArray(project["flyway.callbacks"].toString(), ","))
         } else if (extension.callbacks != null) {
-            flyway.setCallbacks(extension.callbacks)
+            flyway.setCallbacksAsClassNames(extension.callbacks)
         }
 
 		flyway
@@ -161,10 +166,9 @@ abstract class AbstractFlywayTask extends DefaultTask {
     /**
      * @param throwable Throwable instance to be handled
      */
-    private void handleException(Throwable throwable)
-    {
-        String message = "Error occurred while executing ${this.getName()}${System.lineSeparator()}" 
-        throw new FlywayException(collectMessages(throwable, message, 5), throwable)
+    private void handleException(Throwable throwable) {
+        String message = "Error occurred while executing ${this.getName()}"
+        throw new FlywayException(collectMessages(throwable, message), throwable)
     }
 
     /**
@@ -174,12 +178,11 @@ abstract class AbstractFlywayTask extends DefaultTask {
      * @param depth number of levels in the stack trace
      * @return a String containing the composed messages
      */
-    private String collectMessages(Throwable throwable, String message, int depth) {
-        if (depth > 0 && throwable != null) {
-            message += throwable.getMessage() + System.lineSeparator()
-            collectMessages(throwable.getCause(), message, depth--)
-        }
-        else{
+    private String collectMessages(Throwable throwable, String message) {
+        if (throwable != null) {
+            message += "\n" + throwable.getMessage()
+            collectMessages(throwable.getCause(), message)
+        } else {
             message
         }
     }

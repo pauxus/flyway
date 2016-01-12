@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,8 +48,29 @@ public class ClassUtils {
     @SuppressWarnings({"unchecked"})
     // Must be synchronized for the Maven Parallel Junit runner to work
     public static synchronized <T> T instantiate(String className, ClassLoader classLoader) throws Exception {
-        T result = (T) Class.forName(className, true, classLoader).newInstance();
-        return result;
+        return (T) Class.forName(className, true, classLoader).newInstance();
+    }
+
+    /**
+     * Instantiate all these classes.
+     *
+     * @param classes     A fully qualified class names to instantiate.
+     * @param classLoader The ClassLoader to use.
+     * @param <T>         The common type for all classes.
+     * @return The list of instances.
+     */
+    public static <T> List<T> instantiateAll(String[] classes, ClassLoader classLoader) {
+        List<T> clazzes = new ArrayList<T>();
+        for (String clazz : classes) {
+            if (StringUtils.hasLength(clazz)) {
+                try {
+                    clazzes.add(ClassUtils.<T>instantiate(clazz, classLoader));
+                } catch (Exception e) {
+                    throw new FlywayException("Unable to instantiate class: " + clazz, e);
+                }
+            }
+        }
+        return clazzes;
     }
 
     /**

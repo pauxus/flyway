@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,9 +49,9 @@ public class JdbcMigrationResolver implements MigrationResolver {
     private final Location location;
 
     /**
-     * The ClassLoader to use.
+     * The Scanner to use.
      */
-    private ClassLoader classLoader;
+    private Scanner scanner;
 
     /**
      * The flyway master configuration.
@@ -61,12 +61,12 @@ public class JdbcMigrationResolver implements MigrationResolver {
     /**
      * Creates a new instance.
      *
-     * @param location    The base package on the classpath where to migrations are located.
-     * @param classLoader The ClassLoader for loading migrations on the classpath.
+     * @param location The base package on the classpath where to migrations are located.
+     * @param scanner  The Scanner for loading migrations on the classpath.
      */
     public JdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
         this.location = location;
-        this.classLoader = configuration.getClassLoader();
+        this.scanner = configuration.getScanner();
         this.configuration = configuration;
     }
 
@@ -78,9 +78,9 @@ public class JdbcMigrationResolver implements MigrationResolver {
         }
 
         try {
-            Class<?>[] classes = new Scanner(classLoader).scanForClasses(location, JdbcMigration.class);
+            Class<?>[] classes = scanner.scanForClasses(location, JdbcMigration.class);
             for (Class<?> clazz : classes) {
-                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), classLoader, configuration);
+                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), configuration);
 
                 ResolvedMigrationImpl migrationInfo = extractMigrationInfo(jdbcMigration);
                 migrationInfo.setPhysicalLocation(ClassUtils.getLocationOnDisk(clazz));

@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,9 +60,19 @@ public class SqlStatementBuilder {
     private String alternateQuote;
 
     /**
+     * Whether the last processed line ended with a single line -- comment.
+     */
+    private boolean lineEndsWithSingleLineComment = false;
+
+    /**
      * Are we inside a multi-line /*  *&#47; comment.
      */
     private boolean insideMultiLineComment = false;
+
+    /**
+     * Whether a non-comment part of a statement has already been seen.
+     */
+    private boolean nonCommentStatementPartSeen = false;
 
     /**
      * The current delimiter to look for to terminate the statement.
@@ -112,7 +122,8 @@ public class SqlStatementBuilder {
      * @return The assembled statement, with the delimiter stripped off.
      */
     public SqlStatement getSqlStatement() {
-        return new SqlStatement(lineNumber, statement.toString());
+        String sql = statement.toString();
+        return new SqlStatement(lineNumber, sql, isPgCopyFromStdIn());
     }
 
     /**
@@ -124,6 +135,15 @@ public class SqlStatementBuilder {
     @SuppressWarnings("UnusedParameters")
     public Delimiter extractNewDelimiterFromLine(String line) {
         return null;
+    }
+
+    /**
+     * Checks whether this statement is a COPY statement for PostgreSQL.
+     *
+     * @return {@code true} if it is, {@code false} if not.
+     */
+    public boolean isPgCopyFromStdIn() {
+        return false;
     }
 
     /**
@@ -142,7 +162,7 @@ public class SqlStatementBuilder {
      * @param line The line to analyse.
      * @return {@code true} if it is, {@code false} if not.
      */
-    public boolean isSingleLineComment(String line) {
+    protected boolean isSingleLineComment(String line) {
         return line.startsWith("--");
     }
 
@@ -160,7 +180,8 @@ public class SqlStatementBuilder {
 
         String lineSimplified = simplifyLine(line);
 
-        if (endsWithOpenMultilineStringLiteral(lineSimplified)) {
+        applyStateChanges(lineSimplified);
+        if (endWithOpenMultilineStringLiteral() || insideMultiLineComment) {
             statement.append(line);
             return;
         }
@@ -169,11 +190,29 @@ public class SqlStatementBuilder {
 
         statement.append(line);
 
-        if (lineTerminatesStatement(lineSimplified, delimiter)) {
-            //TODO: Check if the delimiter can be stripped from the existing statement instead
-            statement = new StringBuilder(stripDelimiter(statement.toString(), delimiter));
+        if (isCommentDirective(lineSimplified)) {
+            nonCommentStatementPartSeen = true;
+        }
+
+        if (!lineEndsWithSingleLineComment && lineTerminatesStatement(lineSimplified, delimiter)) {
+            stripDelimiter(statement, delimiter);
             terminated = true;
         }
+    }
+
+    /**
+     * Checks whether the statement currently ends with an open multiline string literal.
+     * @return {@code true} if it does, {@code false} if it doesn't.
+     */
+    /* protected -> for testing */ boolean endWithOpenMultilineStringLiteral() {
+        return insideQuoteStringLiteral || insideAlternateQuoteStringLiteral;
+    }
+
+    /**
+     * @return Whether the current statement is only closed comments so far and can be discarded.
+     */
+    public boolean canDiscard() {
+        return !insideAlternateQuoteStringLiteral && !insideQuoteStringLiteral && !insideMultiLineComment && !nonCommentStatementPartSeen;
     }
 
     /**
@@ -183,14 +222,14 @@ public class SqlStatementBuilder {
      * @return The simplified line.
      */
     protected String simplifyLine(String line) {
-        return line.replaceAll("\\s+", " ").trim().toUpperCase();
+        return removeEscapedQuotes(line).replace("--", " -- ").replaceAll("\\s+", " ").trim().toUpperCase();
     }
 
     /**
      * Checks whether this line in the sql script indicates that the statement delimiter will be different from the
      * current one. Useful for database-specific stored procedures and block constructs.
      *
-     * @param line      The line to analyse.
+     * @param line      The simplified line to analyse.
      * @param delimiter The current delimiter.
      * @return The new delimiter to use (can be the same as the current one) or {@code null} for no delimiter.
      */
@@ -225,13 +264,18 @@ public class SqlStatementBuilder {
      *
      * @param sql       The statement to parse.
      * @param delimiter The delimiter to strip.
-     * @return The sql statement without delimiter.
      */
     /* private -> testing */
-    static String stripDelimiter(String sql, Delimiter delimiter) {
-        final int lowerCaseIndex = sql.lastIndexOf(delimiter.getDelimiter().toLowerCase());
-        final int upperCaseIndex = sql.lastIndexOf(delimiter.getDelimiter().toUpperCase());
-        return sql.substring(0, Math.max(lowerCaseIndex, upperCaseIndex));
+    static void stripDelimiter(StringBuilder sql, Delimiter delimiter) {
+        int last;
+
+        for (last = sql.length(); last > 0; last--) {
+            if (!Character.isWhitespace(sql.charAt(last - 1))) {
+                break;
+            }
+        }
+
+        sql.delete(last - delimiter.getDelimiter().length(), sql.length());
     }
 
     /**
@@ -255,28 +299,31 @@ public class SqlStatementBuilder {
     }
 
     /**
-     * Checks whether this line ends the statement with an open multi-line string literal (which will be
-     * continued on the next line).
+     * Applies any state changes resulting from this line being added.
      *
      * @param line The line that was just added to the statement.
-     * @return {@code true} if the statement is unfinished and the end is currently in the middle of a multi-line string
-     *         literal. {@code false} if not.
      */
-    protected boolean endsWithOpenMultilineStringLiteral(String line) {
+    protected void applyStateChanges(String line) {
         //Ignore all special characters that naturally occur in SQL, but are not opening or closing string literals
         String[] tokens = StringUtils.tokenizeToStringArray(line, " @<>;:=|(),+{}");
 
         List<TokenType> delimitingTokens = extractStringLiteralDelimitingTokens(tokens);
 
+        lineEndsWithSingleLineComment = false;
         for (TokenType delimitingToken : delimitingTokens) {
             if (!insideQuoteStringLiteral && !insideAlternateQuoteStringLiteral
-                    && TokenType.MULTI_LINE_COMMENT.equals(delimitingToken)) {
-                insideMultiLineComment = !insideMultiLineComment;
+                    && TokenType.MULTI_LINE_COMMENT_OPEN.equals(delimitingToken)) {
+                insideMultiLineComment = true;
+            }
+            if (!insideQuoteStringLiteral && !insideAlternateQuoteStringLiteral
+                    && TokenType.MULTI_LINE_COMMENT_CLOSE.equals(delimitingToken)) {
+                insideMultiLineComment = false;
             }
 
             if (!insideQuoteStringLiteral && !insideAlternateQuoteStringLiteral && !insideMultiLineComment
                     && TokenType.SINGLE_LINE_COMMENT.equals(delimitingToken)) {
-                return false;
+                lineEndsWithSingleLineComment = true;
+                return;
             }
 
             if (!insideMultiLineComment && !insideQuoteStringLiteral &&
@@ -288,9 +335,12 @@ public class SqlStatementBuilder {
                     TokenType.QUOTE.equals(delimitingToken)) {
                 insideQuoteStringLiteral = !insideQuoteStringLiteral;
             }
-        }
 
-        return insideQuoteStringLiteral || insideAlternateQuoteStringLiteral;
+            if (!insideMultiLineComment && !insideQuoteStringLiteral && !insideAlternateQuoteStringLiteral &&
+                    TokenType.OTHER.equals(delimitingToken)) {
+                nonCommentStatementPartSeen = true;
+            }
+        }
     }
 
     /**
@@ -298,12 +348,13 @@ public class SqlStatementBuilder {
      *
      * @param tokens The tokens to analyse.
      * @return The list of potentially delimiting string literals token types per token. Tokens that do not have any
-     *         impact on string delimiting are discarded.
+     * impact on string delimiting are discarded.
      */
     private List<TokenType> extractStringLiteralDelimitingTokens(String[] tokens) {
         List<TokenType> delimitingTokens = new ArrayList<TokenType>();
         for (String token : tokens) {
-            String cleanToken = removeCharsetCasting(removeEscapedQuotes(token));
+            String cleanToken = cleanToken(token);
+            boolean handled = false;
 
             if (alternateQuote == null) {
                 String alternateQuoteFromToken = extractAlternateOpenQuote(cleanToken);
@@ -318,11 +369,6 @@ public class SqlStatementBuilder {
                     alternateQuote = closeQuote;
                     delimitingTokens.add(TokenType.ALTERNATE_QUOTE);
 
-                    if (cleanToken.startsWith("\"") && cleanToken.endsWith("'")) {
-                        // add QUOTE token for cases where token starts with a " and ends with a '
-                        delimitingTokens.add(TokenType.QUOTE);
-                    }
-
                     continue;
                 }
             }
@@ -336,20 +382,38 @@ public class SqlStatementBuilder {
                 //Skip '', 'abc', ...
                 continue;
             }
-            if (cleanToken.startsWith("'") || cleanToken.endsWith("'")) {
-                delimitingTokens.add(TokenType.QUOTE);
+            if ((cleanToken.length() >= 4)) {
+                int numberOfOpeningMultiLineComments = StringUtils.countOccurrencesOf(cleanToken, "/*");
+                int numberOfClosingMultiLineComments = StringUtils.countOccurrencesOf(cleanToken, "*/");
+                if (numberOfOpeningMultiLineComments > 0 && numberOfOpeningMultiLineComments == numberOfClosingMultiLineComments) {
+                    //Skip /**/, /*comment*/, ...
+                    continue;
+                }
             }
 
             if (isSingleLineComment(cleanToken)) {
                 delimitingTokens.add(TokenType.SINGLE_LINE_COMMENT);
+                handled = true;
             }
 
-            if ((cleanToken.length() >= 4) && cleanToken.startsWith("/*") && cleanToken.endsWith("*/")) {
-                //Skip /**/, /*comment*/, ...
-                continue;
+            if (cleanToken.contains("/*")) {
+                delimitingTokens.add(TokenType.MULTI_LINE_COMMENT_OPEN);
+                handled = true;
+            } else if (cleanToken.startsWith("'")) {
+                delimitingTokens.add(TokenType.QUOTE);
+                handled = true;
             }
-            if (cleanToken.startsWith("/*") || cleanToken.endsWith("*/")) {
-                delimitingTokens.add(TokenType.MULTI_LINE_COMMENT);
+
+            if (!cleanToken.contains("/*") && cleanToken.contains("*/")) {
+                delimitingTokens.add(TokenType.MULTI_LINE_COMMENT_CLOSE);
+                handled = true;
+            } else if (!cleanToken.startsWith("'") && cleanToken.endsWith("'")) {
+                delimitingTokens.add(TokenType.QUOTE);
+                handled = true;
+            }
+
+            if (!handled) {
+                delimitingTokens.add(TokenType.OTHER);
             }
         }
 
@@ -358,6 +422,7 @@ public class SqlStatementBuilder {
 
     /**
      * Removes escaped quotes from this token.
+     *
      * @param token The token to parse.
      * @return The cleaned token.
      */
@@ -366,12 +431,13 @@ public class SqlStatementBuilder {
     }
 
     /**
-     * Removes charset casting that prefixes string literals.
+     * Performs additional cleanup on this token, such as removing charset casting that prefixes string literals.
      * Must be implemented in dialect specific sub classes.
-     * @param token The token to parse.
+     *
+     * @param token The token to clean.
      * @return The cleaned token.
      */
-    protected String removeCharsetCasting(String token) {
+    protected String cleanToken(String token) {
         return token;
     }
 
@@ -379,6 +445,11 @@ public class SqlStatementBuilder {
      * The types of tokens relevant for string delimiter related parsing.
      */
     private static enum TokenType {
+        /**
+         * Some other token.
+         */
+        OTHER,
+
         /**
          * Token opens or closes a ' string literal
          */
@@ -395,8 +466,13 @@ public class SqlStatementBuilder {
         SINGLE_LINE_COMMENT,
 
         /**
-         * Token opens or closes multi-line comment
+         * Token opens a multi-line comment
          */
-        MULTI_LINE_COMMENT
+        MULTI_LINE_COMMENT_OPEN,
+
+        /**
+         * Token closes a multi-line comment
+         */
+        MULTI_LINE_COMMENT_CLOSE;
     }
 }

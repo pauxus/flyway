@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,14 @@
  */
 package org.flywaydb.core.internal.dbsupport.mysql;
 
+import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.internal.dbsupport.DbSupport;
 import org.flywaydb.core.internal.dbsupport.JdbcTemplate;
 import org.flywaydb.core.internal.dbsupport.Schema;
 import org.flywaydb.core.internal.dbsupport.SqlStatementBuilder;
+import org.flywaydb.core.internal.util.StringUtils;
+import org.flywaydb.core.internal.util.logging.Log;
+import org.flywaydb.core.internal.util.logging.LogFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -29,6 +33,8 @@ import java.util.UUID;
  * Mysql-specific support.
  */
 public class MySQLDbSupport extends DbSupport {
+    private static final Log LOG = LogFactory.getLog(MySQLDbSupport.class);
+
     /**
      * Creates a new instance.
      *
@@ -47,20 +53,41 @@ public class MySQLDbSupport extends DbSupport {
     }
 
     @Override
-    protected String doGetCurrentSchema() throws SQLException {
+    protected String doGetCurrentSchemaName() throws SQLException {
         return jdbcTemplate.getConnection().getCatalog();
     }
 
+    /**
+     * Sets the current schema to this schema.
+     *
+     * @param schema The new current schema for this connection.
+     */
+    public void changeCurrentSchemaTo(Schema schema) {
+        if (schema.getName().equals(originalSchema) || !schema.exists()) {
+            return;
+        }
+
+        try {
+            doChangeCurrentSchemaTo(schema.getName());
+        } catch (SQLException e) {
+            throw new FlywayException("Error setting current schema to " + schema, e);
+        }
+    }
+
     @Override
-    protected void doSetCurrentSchema(Schema schema) throws SQLException {
-        if ("".equals(schema.getName())) {
-            // Weird hack to switch back to no database selected...
-            String newDb = quote(UUID.randomUUID().toString());
-            jdbcTemplate.execute("CREATE SCHEMA " + newDb);
-            jdbcTemplate.execute("USE " + newDb);
-            jdbcTemplate.execute("DROP SCHEMA " + newDb);
+    protected void doChangeCurrentSchemaTo(String schema) throws SQLException {
+        if (!StringUtils.hasLength(schema)) {
+            try {
+                // Weird hack to switch back to no database selected...
+                String newDb = quote(UUID.randomUUID().toString());
+                jdbcTemplate.execute("CREATE SCHEMA " + newDb);
+                jdbcTemplate.execute("USE " + newDb);
+                jdbcTemplate.execute("DROP SCHEMA " + newDb);
+            } catch (Exception e) {
+                LOG.warn("Unable to restore connection to having no default schema: " + e.getMessage());
+            }
         } else {
-            jdbcTemplate.execute("USE " + schema);
+            jdbcTemplate.getConnection().setCatalog(schema);
         }
     }
 

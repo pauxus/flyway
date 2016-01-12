@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,13 +74,13 @@ public class DefaultFlywayCallback implements FlywayCallback {
 	}
 
 	@Override
-	public void beforeInit(Connection dataConnection) {
-		LOG.info("beforeInit");
+	public void beforeBaseline(Connection connection) {
+		LOG.info("beforeBaseline");
 	}
 
 	@Override
-	public void afterInit(Connection dataConnection) {
-		LOG.info("afterInit");
+	public void afterBaseline(Connection connection) {
+		LOG.info("afterBaseline");
 	}
 
 	@Override

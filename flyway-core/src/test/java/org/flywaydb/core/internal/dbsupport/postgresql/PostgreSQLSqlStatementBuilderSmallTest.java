@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,37 @@ public class PostgreSQLSqlStatementBuilderSmallTest {
         }
 
         assertTrue(statementBuilder.isTerminated());
+    }
+
+    @Test
+    public void function() {
+        String sqlScriptSource = "CREATE FUNCTION add(integer, integer) RETURNS integer\n" +
+                "    LANGUAGE sql IMMUTABLE STRICT\n" +
+                "    AS $_$select $1 + $2;$_$;\n";
+
+        String[] lines = StringUtils.tokenizeToStringArray(sqlScriptSource, "\n");
+        for (String line : lines) {
+            statementBuilder.addLine(line);
+        }
+
+        assertTrue(statementBuilder.isTerminated());
+    }
+
+    @Test
+    public void ts() {
+        String line = "insert into testDate values (TIMESTAMP '2004-10-19 10:23:54')";
+        statementBuilder.addLine(line + ";\n");
+        assertTrue(statementBuilder.isTerminated());
+        assertEquals(line, statementBuilder.getSqlStatement().getSql());
+    }
+
+    @Test
+    public void copy() {
+        String line = "COPY CSV_FILES FROM '/path/to/filename.csv' DELIMITER ';' CSV HEADER";
+        statementBuilder.addLine(line + ";\n");
+        assertTrue(statementBuilder.isTerminated());
+        assertFalse(statementBuilder.isPgCopyFromStdIn());
+        assertEquals(line, statementBuilder.getSqlStatement().getSql());
     }
 
     @Test

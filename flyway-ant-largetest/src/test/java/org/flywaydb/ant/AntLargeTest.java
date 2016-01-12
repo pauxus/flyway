@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ import static org.junit.Assert.assertTrue;
 @SuppressWarnings({"JavaDoc"})
 public class AntLargeTest {
     @Test
-    public void init() throws Exception {
-        String stdOut = runAnt(0, "init");
+    public void baseline() throws Exception {
+        String stdOut = runAnt(0, "baseline");
         assertTrue(stdOut.contains("A new beginning!"));
     }
 

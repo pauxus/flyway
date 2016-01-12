@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import java.util.Properties;
  * Test to demonstrate the migration functionality using Google Cloud SQL.
  */
 @SuppressWarnings({"JavaDoc"})
-@Category(DbCategory.MySQL.class)
+@Category(DbCategory.GoogleCloudSQL.class)
 public class GoogleCloudSQLMigrationMediumTest extends MySQLMigrationTestCase {
     private LocalServiceTestHelper helper;
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.flywaydb.commandline;
 
+import org.flywaydb.core.internal.util.Location;
+import org.flywaydb.core.internal.util.logging.console.ConsoleLog.Level;
 import org.flywaydb.core.api.migration.spring.SpringJdbcMigration;
 import org.flywaydb.core.internal.util.scanner.classpath.ClassPathResource;
 import org.flywaydb.core.internal.util.ClassUtils;
@@ -42,7 +44,7 @@ public class MainClassLoaderSmallTest {
     @Before
     public void setUp() {
         oldClassLoader = getClassLoader();
-        Main.initLogging(false);
+        Main.initLogging(Level.INFO);
     }
 
     @After
@@ -59,7 +61,7 @@ public class MainClassLoaderSmallTest {
         String filename = new ClassPathResource("test.properties", getClassLoader()).getLocationOnDisk();
         String[] args = new String[]{"-configFile=" + filename, "-configFileEncoding=UTF-8"};
 
-        Main.loadConfigurationFile(properties, args);
+        Main.loadConfiguration(properties, args);
 
         assertEquals(4, properties.size());
         assertEquals("still there!", properties.getProperty("existing"));
@@ -67,20 +69,33 @@ public class MainClassLoaderSmallTest {
         assertEquals("wins :-)", properties.getProperty("override"));
     }
 
+    @Test
+    public void loadConfigurationFileBackslash() throws Exception {
+        Properties properties = new Properties();
+
+        String filename = new ClassPathResource("dynamic/pkg/runtime.conf", getClassLoader()).getLocationOnDisk();
+        String[] args = new String[]{"-configFile=" + filename, "-configFileEncoding=UTF-8"};
+
+        Main.loadConfiguration(properties, args);
+
+        assertEquals(1, properties.size());
+        assertEquals("at\\runtime", properties.getProperty("loaded"));
+    }
+
     /**
      * Tests dynamically adding a directory to the classpath.
      */
     @Test
     public void addDirectoryToClasspath() throws Exception {
-        assertFalse(new ClassPathResource("pkg/runtime.properties", getClassLoader()).exists());
+        assertFalse(new ClassPathResource("pkg/runtime.conf", getClassLoader()).exists());
 
         String folder = new ClassPathResource("dynamic", getClassLoader()).getLocationOnDisk();
         Main.addJarOrDirectoryToClasspath(folder);
 
-        assertTrue(new ClassPathResource("pkg/runtime.properties", getClassLoader()).exists());
+        assertTrue(new ClassPathResource("pkg/runtime.conf", getClassLoader()).exists());
 
-        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources("pkg", "run", ".properties");
-        assertEquals("pkg/runtime.properties", resources[0].getLocation());
+        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources(new Location("classpath:pkg"), "run", ".conf");
+        assertEquals("pkg/runtime.conf", resources[0].getLocation());
     }
 
     /**
@@ -88,15 +103,15 @@ public class MainClassLoaderSmallTest {
      */
     @Test
     public void addDirectoryToClasspathDefaultPackage() throws Exception {
-        assertFalse(new ClassPathResource("runtime.properties", getClassLoader()).exists());
+        assertFalse(new ClassPathResource("runtime.conf", getClassLoader()).exists());
 
-        String folder = new ClassPathResource("dynamic/pkg", getClassLoader()).getLocationOnDisk();
+        String folder = new ClassPathResource("dynamic/pkg2", getClassLoader()).getLocationOnDisk();
         Main.addJarOrDirectoryToClasspath(folder);
 
-        assertTrue(new ClassPathResource("runtime.properties", getClassLoader()).exists());
+        assertTrue(new ClassPathResource("funtime.properties", getClassLoader()).exists());
 
-        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources("", "run", ".properties");
-        assertEquals("runtime.properties", resources[1].getLocation());
+        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources(new Location("classpath:"), "fun", ".properties");
+        assertEquals("funtime.properties", resources[1].getLocation());
     }
 
     private ClassLoader getClassLoader() {
@@ -118,10 +133,10 @@ public class MainClassLoaderSmallTest {
         assertTrue(new ClassPathResource("db/migration/V1__Initial_structure.sql", getClassLoader()).exists());
         assertTrue(ClassUtils.isPresent("org.flywaydb.sample.migration.V1_2__Another_user", getClassLoader()));
 
-        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources("db/migration", "V1__", ".sql");
+        Resource[] resources = new ClassPathScanner(getClassLoader()).scanForResources(new Location("classpath:db/migration"), "V1__", ".sql");
         assertEquals("db/migration/V1__Initial_structure.sql", resources[0].getLocation());
 
-        Class<?>[] classes = new ClassPathScanner(getClassLoader()).scanForClasses("org/flywaydb/sample/migration", SpringJdbcMigration.class);
+        Class<?>[] classes = new ClassPathScanner(getClassLoader()).scanForClasses(new Location("classpath:org/flywaydb/sample/migration"), SpringJdbcMigration.class);
         assertEquals("org.flywaydb.sample.migration.V1_2__Another_user", classes[0].getName());
     }
 }

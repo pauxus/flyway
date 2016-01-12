@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,9 +27,9 @@ public class MigrationInfoContext {
     public boolean outOfOrder;
 
     /**
-     * Whether pending migrations are allowed.
+     * Whether pending or future migrations are allowed.
      */
-    public boolean pending;
+    public boolean pendingOrFuture;
 
     /**
      * The migration target.
@@ -42,9 +42,9 @@ public class MigrationInfoContext {
     public MigrationVersion schema;
 
     /**
-     * The INIT migration version that was applied.
+     * The BASELINE migration version that was applied.
      */
-    public MigrationVersion init;
+    public MigrationVersion baseline;
 
     /**
      * The last resolved migration.
@@ -65,9 +65,9 @@ public class MigrationInfoContext {
         MigrationInfoContext context = (MigrationInfoContext) o;
 
         if (outOfOrder != context.outOfOrder) return false;
-        if (pending != context.pending) return false;
+        if (pendingOrFuture != context.pendingOrFuture) return false;
         if (schema != null ? !schema.equals(context.schema) : context.schema != null) return false;
-        if (init != null ? !init.equals(context.init) : context.init != null) return false;
+        if (baseline != null ? !baseline.equals(context.baseline) : context.baseline != null) return false;
         if (!lastApplied.equals(context.lastApplied)) return false;
         if (!lastResolved.equals(context.lastResolved)) return false;
         return target.equals(context.target);
@@ -76,10 +76,10 @@ public class MigrationInfoContext {
     @Override
     public int hashCode() {
         int result = (outOfOrder ? 1 : 0);
-        result = 31 * result + (pending ? 1 : 0);
+        result = 31 * result + (pendingOrFuture ? 1 : 0);
         result = 31 * result + target.hashCode();
         result = 31 * result + (schema != null ? schema.hashCode() : 0);
-        result = 31 * result + (init != null ? init.hashCode() : 0);
+        result = 31 * result + (baseline != null ? baseline.hashCode() : 0);
         result = 31 * result + lastResolved.hashCode();
         result = 31 * result + lastApplied.hashCode();
         return result;

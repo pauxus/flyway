@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,41 +24,41 @@ import org.flywaydb.core.api.MigrationInfo;
  * Simply add code to the callback method you are interested in having.
  *
  * <p>Each callback method will run within its own transaction.</p>
- *
+ * 
  * @author Dan Bunker
  */
 public interface FlywayCallback {
 	/**
 	 * Runs before the clean task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeClean(Connection connection);
 
 	/**
 	 * Runs after the clean task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void afterClean(Connection connection);
 
 	/**
 	 * Runs before the migrate task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeMigrate(Connection connection);
 
 	/**
 	 * Runs after the migrate task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void afterMigrate(Connection connection);
 
 	/**
 	 * Runs before each migration script is executed.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 * @param info The current MigrationInfo for this migration.
 	 */
@@ -66,7 +66,7 @@ public interface FlywayCallback {
 
 	/**
 	 * Runs after each migration script is executed.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 * @param info The current MigrationInfo for this migration.
 	 */
@@ -74,58 +74,57 @@ public interface FlywayCallback {
 
 	/**
 	 * Runs before the validate task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeValidate(Connection connection);
 
 	/**
 	 * Runs after the validate task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void afterValidate(Connection connection);
 
 	/**
-	 * Runs before the init task executes.
-	 *
+	 * Runs before the baseline task executes.
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
-	void beforeInit(Connection connection);
+	void beforeBaseline(Connection connection);
 
 	/**
-	 * Runs after the init task executes.
-	 *
+	 * Runs after the baseline task executes.
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
-	void afterInit(Connection connection);
+	void afterBaseline(Connection connection);
 
 	/**
 	 * Runs before the repair task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeRepair(Connection connection);
 
 	/**
 	 * Runs after the repair task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void afterRepair(Connection connection);
 
 	/**
 	 * Runs before the info task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void beforeInfo(Connection connection);
 
 	/**
 	 * Runs after the info task executes.
-	 *
+	 * 
 	 * @param connection A valid connection to the database.
 	 */
 	void afterInfo(Connection connection);
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,10 +36,14 @@ import java.util.logging.Logger;
  * YAGNI: The simplest DataSource implementation that works for Flyway.
  */
 public class DriverDataSource implements DataSource {
+    private static final String MARIADB_JDBC_DRIVER = "org.mariadb.jdbc.Driver";
+    private static final String MYSQL_JDBC_URL_PREFIX = "jdbc:mysql:";
+    private static final String ORACLE_JDBC_URL_PREFIX = "jdbc:oracle:";
+
     /**
      * The JDBC Driver instance to use.
      */
-    private final Driver driver;
+    private Driver driver;
 
     /**
      * The JDBC URL to use for connecting through the Driver.
@@ -62,6 +66,11 @@ public class DriverDataSource implements DataSource {
     private final String[] initSqls;
 
     /**
+     * The properties to be passed to a new connection.
+     */
+    private final Properties defaultProps;
+
+    /**
      * The ClassLoader to use.
      */
     private final ClassLoader classLoader;
@@ -72,9 +81,14 @@ public class DriverDataSource implements DataSource {
     private boolean singleConnectionMode;
 
     /**
-     * The Single Connection for single connection mode.
+     * The original Single Connection for single connection mode.
      */
-    private Connection singleConnection;
+    private Connection originalSingleConnection;
+
+    /**
+     * The Single Connection for single connection mode, adjusted to make it suppress close()..
+     */
+    private Connection uncloseableSingleConnection;
 
     /**
      * Creates a new DriverDataSource.
@@ -100,19 +114,70 @@ public class DriverDataSource implements DataSource {
         if (!StringUtils.hasLength(driverClass)) {
             driverClass = detectDriverForUrl(url);
             if (!StringUtils.hasLength(driverClass)) {
-                throw new FlywayException("Unable to autodetect Jdbc driver for url: " + url);
+                throw new FlywayException("Unable to autodetect JDBC driver for url: " + url);
             }
         }
+
+        this.defaultProps = detectPropsForUrl(url);
 
         try {
             this.driver = ClassUtils.instantiate(driverClass, classLoader);
         } catch (Exception e) {
-            throw new FlywayException("Unable to instantiate jdbc driver: " + driverClass, e);
+            String backupDriverClass = detectBackupDriverForUrl(url);
+            if (backupDriverClass == null) {
+                throw new FlywayException("Unable to instantiate JDBC driver: " + driverClass, e);
+            }
+            try {
+                this.driver = ClassUtils.instantiate(backupDriverClass, classLoader);
+            } catch (Exception e1) {
+                // Only report original exception about primary driver
+                throw new FlywayException("Unable to instantiate JDBC driver: " + driverClass, e);
+            }
         }
 
         this.user = user;
         this.password = password;
+
+        if (initSqls == null) {
+            initSqls = new String[0];
+        }
         this.initSqls = initSqls;
+    }
+
+    /**
+     * Detect the default connection properties for this url.
+     *
+     * @param url The Jdbc url.
+     * @return The properties.
+     */
+    private Properties detectPropsForUrl(String url) {
+        Properties result = new Properties();
+
+        if (url.startsWith(ORACLE_JDBC_URL_PREFIX)) {
+            String osUser = System.getProperty("user.name");
+            result.put("v$session.osuser", osUser.substring(0, Math.min(osUser.length(), 30)));
+            result.put("v$session.program", "Flyway by Boxfuse");
+        }
+
+        return result;
+    }
+
+    /**
+     * Retrieves a second choice backup driver for a jdbc url, in case the primary driver is not available.
+     *
+     * @param url The Jdbc url.
+     * @return The Jdbc driver. {@code null} if none.
+     */
+    private String detectBackupDriverForUrl(String url) {
+        if (url.startsWith(MYSQL_JDBC_URL_PREFIX)) {
+            return MARIADB_JDBC_DRIVER;
+        }
+
+        if (url.startsWith("jdbc:redshift:")) {
+            return "com.amazon.redshift.jdbc4.Driver";
+        }
+
+        return null;
     }
 
     /**
@@ -124,6 +189,10 @@ public class DriverDataSource implements DataSource {
     private String detectDriverForUrl(String url) {
         if (url.startsWith("jdbc:db2:")) {
             return "com.ibm.db2.jcc.DB2Driver";
+        }
+
+        if (url.startsWith("jdbc:derby://")) {
+            return "org.apache.derby.jdbc.ClientDriver";
         }
 
         if (url.startsWith("jdbc:derby:")) {
@@ -150,25 +219,34 @@ public class DriverDataSource implements DataSource {
             return "org.sqldroid.SQLDroidDriver";
         }
 
-        if (url.startsWith("jdbc:mysql:")) {
+        if (url.startsWith(MYSQL_JDBC_URL_PREFIX)) {
             return "com.mysql.jdbc.Driver";
         }
 
         if (url.startsWith("jdbc:mariadb:")) {
-            return "org.mariadb.jdbc.Driver";
+            return MARIADB_JDBC_DRIVER;
         }
 
         if (url.startsWith("jdbc:google:")) {
             return "com.google.appengine.api.rdbms.AppEngineDriver";
         }
 
-        if (url.startsWith("jdbc:oracle:")) {
+        if (url.startsWith(ORACLE_JDBC_URL_PREFIX)) {
             return "oracle.jdbc.OracleDriver";
         }
 
+        if (url.startsWith("jdbc:phoenix")) {
+            return "org.apache.phoenix.jdbc.PhoenixDriver";
+        }
+
         if (url.startsWith("jdbc:postgresql:")) {
-            // The format of Redshift JDBC urls is the same as PostgreSQL, and Redshift uses the same JDBC driver
+            // The old format of Redshift JDBC urls is the same as PostgreSQL, and Redshift can still use the same JDBC driver:
             return "org.postgresql.Driver";
+        }
+
+        if (url.startsWith("jdbc:redshift:")) {
+            // The new format of Redshift JDBC urls, using the new Redshift-specific JDBC driver:
+            return "com.amazon.redshift.jdbc41.Driver";
         }
 
         if (url.startsWith("jdbc:jtds:")) {
@@ -181,6 +259,10 @@ public class DriverDataSource implements DataSource {
 
         if (url.startsWith("jdbc:vertica:")) {
             return "com.vertica.jdbc.Driver";
+        }
+
+        if (url.startsWith("jdbc:sap:")) {
+            return "com.sap.db.jdbc.Driver";
         }
 
         return null;
@@ -227,6 +309,7 @@ public class DriverDataSource implements DataSource {
      *
      * @see #getConnectionFromDriver(String, String)
      */
+    @Override
     public Connection getConnection() throws SQLException {
         return getConnectionFromDriver(getUser(), getPassword());
     }
@@ -237,6 +320,7 @@ public class DriverDataSource implements DataSource {
      *
      * @see #getConnectionFromDriver(String, String)
      */
+    @Override
     public Connection getConnection(String username, String password) throws SQLException {
         return getConnectionFromDriver(username, password);
     }
@@ -253,11 +337,11 @@ public class DriverDataSource implements DataSource {
      * @see java.sql.Driver#connect(String, java.util.Properties)
      */
     protected Connection getConnectionFromDriver(String username, String password) throws SQLException {
-        if (singleConnectionMode && (singleConnection != null)) {
-            return singleConnection;
+        if (singleConnectionMode && (uncloseableSingleConnection != null)) {
+            return uncloseableSingleConnection;
         }
 
-        Properties props = new Properties();
+        Properties props = new Properties(this.defaultProps);
         if (username != null) {
             props.setProperty("user", username);
         }
@@ -269,7 +353,7 @@ public class DriverDataSource implements DataSource {
             connection = driver.connect(url, props);
         } catch (SQLException e) {
             throw new FlywayException(
-                    "Unable to obtain Jdbc connection from DataSource (" + url + ") for user '" + user + "'", e);
+                    "Unable to obtain Jdbc connection from DataSource (" + url + ") for user '" + user + "': " + e.getMessage(), e);
         }
 
         for (String initSql : initSqls) {
@@ -283,10 +367,11 @@ public class DriverDataSource implements DataSource {
         }
 
         if (singleConnectionMode) {
-            InvocationHandler suppressCloseHandler = new SuppressCloseHandler(connection);
-            singleConnection =
-                    (Connection) Proxy.newProxyInstance(classLoader, new Class[] {Connection.class}, suppressCloseHandler);
-            return singleConnection;
+            originalSingleConnection = connection;
+            InvocationHandler suppressCloseHandler = new SuppressCloseHandler(originalSingleConnection);
+            uncloseableSingleConnection =
+                    (Connection) Proxy.newProxyInstance(classLoader, new Class[]{Connection.class}, suppressCloseHandler);
+            return uncloseableSingleConnection;
         }
 
         return connection;
@@ -341,7 +426,8 @@ public class DriverDataSource implements DataSource {
      * Closes this datasource.
      */
     public void close() {
-        JdbcUtils.closeConnection(singleConnection);
-        singleConnection = null;
+        uncloseableSingleConnection = null;
+        JdbcUtils.closeConnection(originalSingleConnection);
+        originalSingleConnection = null;
     }
 }

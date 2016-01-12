@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,7 +174,7 @@ public class RedshiftMigrationMediumTest extends MigrationTestCase {
     public void dollarQuote() throws Exception {
         flyway.setLocations("migration/dbsupport/redshift/sql/dollar");
         flyway.migrate();
-        assertEquals(9, jdbcTemplate.queryForInt("select count(*) from dollar"));
+        assertEquals(5, jdbcTemplate.queryForInt("select count(*) from dollar"));
     }
 
     /**
@@ -216,7 +216,7 @@ public class RedshiftMigrationMediumTest extends MigrationTestCase {
                 return connection;
             }
         });
-        flyway1.setLocations(BASEDIR);
+        flyway1.setLocations(getBasedir());
         flyway1.setSchemas("public");
         flyway1.migrate();
     }

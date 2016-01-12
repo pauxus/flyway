@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2014 Axel Fontaine
+-- Copyright 2010-2015 Boxfuse GmbH
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -17,3 +17,5 @@
 CREATE TABLE """t""" (qty INT, price INT);
 INSERT INTO """t""" VALUES(3, 50);
 CREATE VIEW """v""" AS SELECT qty, price, qty*price AS value FROM """t""";
+
+CREATE VIEW features AS SELECT * FROM information_schema.sql_features;

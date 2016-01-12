@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,15 @@ public class H2MigrationMediumTest extends MigrationTestCase {
         Flyway flyway = new Flyway();
         flyway.setDataSource("jdbc:h2:mem:mysql_db;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         flyway.setSchemas("mysql_schema");
-        flyway.init();
+        flyway.baseline();
+    }
+
+    @Test
+    public void mysqlModePublic() throws Exception {
+        Flyway flyway = new Flyway();
+        flyway.setDataSource("jdbc:h2:mem:mysql_public_db;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+        flyway.setSchemas("PUBLIC");
+        flyway.baseline();
     }
 
     @Test

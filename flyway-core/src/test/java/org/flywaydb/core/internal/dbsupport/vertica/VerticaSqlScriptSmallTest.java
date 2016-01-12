@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +35,9 @@ public class VerticaSqlScriptSmallTest {
 
         SqlScript sqlScript = new SqlScript(source, new VerticaDbSupport(null));
         List<SqlStatement> sqlStatements = sqlScript.getSqlStatements();
-        assertEquals(3, sqlStatements.size());
+        assertEquals(10, sqlStatements.size());
         assertEquals(17, sqlStatements.get(0).getLineNumber());
         assertEquals(19, sqlStatements.get(1).getLineNumber());
-        assertEquals(23, sqlStatements.get(2).getLineNumber());
+        assertEquals(20, sqlStatements.get(2).getLineNumber());
     }
 }

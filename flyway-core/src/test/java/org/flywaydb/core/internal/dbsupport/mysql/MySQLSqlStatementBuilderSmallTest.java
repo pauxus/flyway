@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,6 +131,32 @@ public class MySQLSqlStatementBuilderSmallTest {
     @Test
     public void stringEndingInDoubleQuote() throws Exception {
         builder.addLine("INSERT INTO Tablename (id) VALUES (' \"');");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void stringEndingInSingleQuote() throws Exception {
+        builder.addLine("INSERT INTO Tablename (id) VALUES (\"' '\");");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void stringMixedQuotes() throws Exception {
+        builder.addLine("SET sql_cmd = CONCAT(");
+        assertFalse(builder.isTerminated());
+        builder.addLine("    'SELECT");
+        assertFalse(builder.isTerminated());
+        builder.addLine("    \"',dt0,'\" AS from_date");
+        assertFalse(builder.isTerminated());
+        builder.addLine("FROM stats_bonus s1");
+        assertFalse(builder.isTerminated());
+        builder.addLine("WHERE s1.agg_date=\"',dt1,'\"');");
+        assertTrue(builder.isTerminated());
+    }
+
+    @Test
+    public void stringBeginningWithInSingleQuote() throws Exception {
+        builder.addLine("INSERT INTO Tablename (id) VALUES (\"' \");");
         assertTrue(builder.isTerminated());
     }
 

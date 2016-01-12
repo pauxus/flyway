@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ public class SqlScriptSmallTest {
     /**
      * Class under test.
      */
-    private SqlScript sqlScript = new SqlScript(new MySQLDbSupport(null));
+    private SqlScript sqlScript = new SqlScript("", new MySQLDbSupport(null));
 
     /**
      * Input lines.
@@ -105,6 +105,28 @@ public class SqlScriptSmallTest {
         SqlStatement sqlStatement = sqlStatements.get(0);
         assertEquals(4, sqlStatement.getLineNumber());
         assertEquals("SELECT 1", sqlStatement.getSql());
+    }
+
+    @Test
+    public void linesToStatementsJointMultilineSingleLineComment() {
+        lines.add("/**");
+        lines.add("--insert something");
+        lines.add("INSERT INTO mytable (id, data1, data2)VALUES (3,1,'hi');");
+        lines.add("**/-- Comment on the same line attached to the multiline closing");
+        lines.add("--these statements are not imported because end of multiline is not detected");
+        lines.add("INSERT INTO mytable (id, data1, data2)VALUES (1,1,'hi');");
+        lines.add("/**");
+        lines.add("--insert something");
+        lines.add("INSERT INTO mytable (id, data1, data2)VALUES (4,1,'hi');");
+        lines.add("**/");
+        lines.add("--these statements are imported the above multiline is detected");
+        lines.add("INSERT INTO mytable (id, data1, data2)VALUES (5,1,'hi');");
+
+        List<SqlStatement> sqlStatements = sqlScript.linesToStatements(lines);
+        assertEquals(2, sqlStatements.size());
+
+        assertEquals(6, sqlStatements.get(0).getLineNumber());
+        assertEquals(12, sqlStatements.get(1).getLineNumber());
     }
 
     @Test

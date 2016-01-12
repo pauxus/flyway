@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,14 @@ public class CommandLineLargeTest {
     @Test
     public void showUsage() throws Exception {
         String stdOut = runFlywayCommandLine(0, null, null);
-        assertTrue(stdOut.contains("* Usage"));
+        assertTrue(stdOut.contains("Usage"));
         assertTrue(stdOut.contains("callback"));
+    }
+    
+    @Test
+    public void quietMode() throws Exception {
+        String stdOut = runFlywayCommandLine(0, null, null, "-q");
+        assertTrue(stdOut.isEmpty());
     }
 
     @Test
@@ -76,14 +82,13 @@ public class CommandLineLargeTest {
     public void exitCodeForFailedMigration() throws Exception {
         String stdOut = runFlywayCommandLine(1, "largeTest.properties", "migrate", "-locations=filesystem:sql/invalid");
         assertTrue(stdOut.contains("Migration of schema \"PUBLIC\" to version 1 failed!"));
-        assertTrue(stdOut.contains("ERROR: Error executing statement at line 17: InVaLiD SqL !!!\n"
-                + "ERROR: Caused by: org.hsqldb.HsqlException: unexpected token: INVALID\n"
-                + "ERROR: Occured in org.hsqldb.error.Error.parseError() at line -1"));
+        assertTrue(stdOut.contains("17"));
+        assertTrue(stdOut.contains("InVaLiD SqL !!!"));
     }
 
     @Test
     public void sqlFolderRoot() throws Exception {
-        String stdOut = runFlywayCommandLine(0, null, "migrate", "-user=SA", "-url=jdbc:hsqldb:mem:flyway_db",
+        String stdOut = runFlywayCommandLine(0, null, "migrate", "-user=SA", "-url=jdbc:hsqldb:mem:flyway_db", "-jarDirs=jardir",
                 "-driver=org.hsqldb.jdbcDriver", "-sqlMigrationPrefix=Mig", "-resolvers=");
         assertTrue(stdOut.contains("777"));
         assertTrue(stdOut.contains("Successfully applied 1 migration"));
@@ -91,7 +96,7 @@ public class CommandLineLargeTest {
 
     @Test
     public void jarFile() throws Exception {
-        String stdOut = runFlywayCommandLine(0, null, "migrate", "-user=SA", "-url=jdbc:hsqldb:mem:flyway_db",
+        String stdOut = runFlywayCommandLine(0, null, "migrate", "-user=SA", "-url=jdbc:hsqldb:mem:flyway_db", "-jarDirs=jardir",
                 "-driver=org.hsqldb.jdbcDriver", "-locations=db/migration,org/flywaydb/sample/migration", "-resolvers=");
         assertTrue(stdOut.contains("Successfully applied 3 migrations"));
     }
@@ -122,7 +127,7 @@ public class CommandLineLargeTest {
         args.addAll(Arrays.asList(extraArgs));
 
         //Debug mode
-        //args.add("-X");
+        args.add("-X");
 
         ProcessBuilder builder = new ProcessBuilder(args);
         builder.directory(new File(installDir));

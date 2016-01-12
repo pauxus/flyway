@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,22 +50,22 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
     private final Location location;
 
     /**
-     * The ClassLoader to use.
+     * The Scanner to use.
      */
-    private ClassLoader classLoader;
+    private Scanner scanner;
 
     private FlywayConfiguration configuration;
 
     /**
      * Creates a new instance.
      *
-     * @param location    The base package on the classpath where to migrations are located.
-     * @param classLoader The ClassLoader for loading migrations on the classpath.
+     * @param location The base package on the classpath where to migrations are located.
+     * @param scanner  The Scanner for loading migrations on the classpath.
      */
     public SpringJdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
         this.configuration = configuration;
         this.location = location;
-        this.classLoader = configuration.getClassLoader();
+        this.scanner = configuration.getScanner();
     }
 
     public Collection<ResolvedMigration> resolveMigrations() {
@@ -76,9 +76,9 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
         }
 
         try {
-            Class<?>[] classes = new Scanner(classLoader).scanForClasses(location, SpringJdbcMigration.class);
+            Class<?>[] classes = scanner.scanForClasses(location, SpringJdbcMigration.class);
             for (Class<?> clazz : classes) {
-                SpringJdbcMigration springJdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), classLoader, configuration);
+                SpringJdbcMigration springJdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), configuration);
 
                 ResolvedMigrationImpl migrationInfo = extractMigrationInfo(springJdbcMigration);
                 migrationInfo.setPhysicalLocation(ClassUtils.getLocationOnDisk(clazz));

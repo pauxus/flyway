@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import org.flywaydb.core.api.MigrationInfo;
  * notifications are getting called correctly
  *
  * @author Dan Bunker
- *
  */
 public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 
@@ -42,8 +41,8 @@ public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 	private boolean afterEachMigrate = false;
 	private boolean beforeValidate = false;
 	private boolean afterValidate = false;
-	private boolean beforeInit = false;
-	private boolean afterInit = false;
+	private boolean beforeBaseline = false;
+	private boolean afterBaseline = false;
 	private boolean beforeRepair = false;
 	private boolean afterRepair = false;
 	private boolean beforeInfo = false;
@@ -100,14 +99,14 @@ public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 	}
 
 	@Override
-	public void beforeInit(Connection dataConnection) {
-		beforeInit = true;
+	public void beforeBaseline(Connection dataConnection) {
+		beforeBaseline = true;
         assertNotNull(dataConnection);
 	}
 
 	@Override
-	public void afterInit(Connection dataConnection) {
-		afterInit = true;
+	public void afterBaseline(Connection dataConnection) {
+		afterBaseline = true;
         assertNotNull(dataConnection);
 	}
 
@@ -172,12 +171,12 @@ public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 		return afterValidate;
 	}
 
-	public boolean isBeforeInit() {
-		return beforeInit;
+	public boolean isBeforeBaseline() {
+		return beforeBaseline;
 	}
 
-	public boolean isAfterInit() {
-		return afterInit;
+	public boolean isAfterBaseline() {
+		return afterBaseline;
 	}
 
 	public boolean isBeforeRepair() {

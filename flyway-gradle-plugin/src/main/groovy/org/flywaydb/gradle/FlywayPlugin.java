@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package org.flywaydb.gradle;
 
 import org.flywaydb.gradle.task.FlywayCleanTask;
 import org.flywaydb.gradle.task.FlywayInfoTask;
-import org.flywaydb.gradle.task.FlywayInitTask;
+import org.flywaydb.gradle.task.FlywayBaselineTask;
 import org.flywaydb.gradle.task.FlywayMigrateTask;
 import org.flywaydb.gradle.task.FlywayRepairTask;
 import org.flywaydb.gradle.task.FlywayValidateTask;
@@ -35,7 +35,7 @@ public class FlywayPlugin implements Plugin<Project> {
     public void apply(Project project) {
         project.getExtensions().create("flyway", FlywayExtension.class);
         project.getTasks().create("flywayClean", FlywayCleanTask.class);
-        project.getTasks().create("flywayInit", FlywayInitTask.class);
+        project.getTasks().create("flywayBaseline", FlywayBaselineTask.class);
         project.getTasks().create("flywayMigrate", FlywayMigrateTask.class);
         project.getTasks().create("flywayValidate", FlywayValidateTask.class);
         project.getTasks().create("flywayInfo", FlywayInfoTask.class);

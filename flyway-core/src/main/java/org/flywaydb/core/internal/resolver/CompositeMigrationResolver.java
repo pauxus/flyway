@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import org.flywaydb.core.internal.util.FeatureDetector;
 import org.flywaydb.core.internal.util.Location;
 import org.flywaydb.core.internal.util.Locations;
 import org.flywaydb.core.internal.util.PlaceholderReplacer;
+import org.flywaydb.core.internal.util.scanner.Scanner;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,7 +57,7 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * Creates a new CompositeMigrationResolver.
      *
      * @param dbSupport                The database-specific support.
-     * @param classLoader              The ClassLoader for loading migrations on the classpath.
+     * @param scanner                  The Scanner for loading migrations on the classpath.
      * @param locations                The locations where migrations are located.
      * @param encoding                 The encoding of Sql migrations.
      * @param sqlMigrationPrefix       The file name prefix for sql migrations.
@@ -65,15 +66,30 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * @param placeholderReplacer      The placeholder replacer to use.
      * @param customMigrationResolvers Custom Migration Resolvers.
      */
-    public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
+    public CompositeMigrationResolver(DbSupport dbSupport, Scanner scanner, Locations locations,
+                                      String encoding,
+                                      String sqlMigrationPrefix, String sqlMigrationSeparator, String sqlMigrationSuffix,
+                                      PlaceholderReplacer placeholderReplacer,
+                                      MigrationResolver... customMigrationResolvers) {
+        for (Location location : locations.getLocations()) {
+            migrationResolvers.add(new SqlMigrationResolver(dbSupport, scanner, location, placeholderReplacer,
+                    encoding, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix));
+            migrationResolvers.add(new JdbcMigrationResolver(scanner, location));
+
+            /*
+
+            TODO: Adapt
+            public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
         PlaceholderReplacer placeholderReplacer =
                 new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
         for (Location location : new Locations(config.getLocations()).getLocations()) {
             migrationResolvers.add(new SqlMigrationResolver(dbSupport, config, location, placeholderReplacer));
             migrationResolvers.add(new JdbcMigrationResolver(config, location));
 
-            if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
-                migrationResolvers.add(new SpringJdbcMigrationResolver(config, location));
+             */
+
+            if (new FeatureDetector(scanner.getClassLoader()).isSpringJdbcAvailable()) {
+                migrationResolvers.add(new SpringJdbcMigrationResolver(scanner, location));
             }
         }
 
@@ -139,12 +155,12 @@ public class CompositeMigrationResolver implements MigrationResolver {
             ResolvedMigration current = migrations.get(i);
             ResolvedMigration next = migrations.get(i + 1);
             if (current.getVersion().compareTo(next.getVersion()) == 0) {
-                throw new FlywayException(String.format("Found more than one migration with version '%s' (Offenders: %s '%s' and %s '%s')",
+                throw new FlywayException(String.format("Found more than one migration with version %s\nOffenders:\n-> %s (%s)\n-> %s (%s)",
                         current.getVersion(),
-                        current.getType(),
                         current.getPhysicalLocation(),
-                        next.getType(),
-                        next.getPhysicalLocation()));
+                        current.getType(),
+                        next.getPhysicalLocation(),
+                        next.getType()));
             }
         }
     }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.flywaydb.core;
 
 import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.internal.dbsupport.DbSupport;
 import org.flywaydb.core.internal.dbsupport.Schema;
 import org.flywaydb.core.internal.resolver.MyConfigurationAwareCustomMigrationResolver;
@@ -48,7 +49,7 @@ public class FlywaySmallTest {
         assertNotNull(flyway.getDataSource());
 
         flyway.execute(new Flyway.Command<Void>() {
-            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, DbSupport dbSupport, Schema[] schemas) {
+            public Void execute(Connection connectionMetaDataTable, Connection connectionUserObjects, MigrationResolver migrationResolver, DbSupport dbSupport, Schema[] schemas) {
                 assertEquals("PUBLIC", flyway.getSchemas()[0]);
                 return null;
             }

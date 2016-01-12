@@ -9,7 +9,7 @@ buildscript {
     }
 }
 
-apply plugin: 'flyway'
+apply plugin: 'org.flywaydb.flyway'
 apply plugin: 'java'
 apply plugin: 'maven'
 
@@ -25,11 +25,8 @@ dependencies {
 
 flyway {
     url = "jdbc:hsqldb:file:${buildDir}/db/flyway_sample;shutdown=true"
-    locations = [
-            'classpath:db.migration'
-    ]
     placeholders = ['execUserName' : "${project.name}"]
-    initVersion = 0
+    baselineVersion = 0
     target = '7'
 }
 

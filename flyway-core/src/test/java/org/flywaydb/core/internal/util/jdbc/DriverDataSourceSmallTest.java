@@ -1,5 +1,5 @@
 /**
- * Copyright 2010-2014 Axel Fontaine
+ * Copyright 2010-2015 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@ import org.junit.Test;
 
 import java.sql.SQLException;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class DriverDataSourceSmallTest {
     @Test
@@ -37,5 +38,11 @@ public class DriverDataSourceSmallTest {
             assertTrue(e.getMessage().contains(user));
             assertFalse(e.getMessage().contains(password));
         }
+    }
+
+    @Test
+    public void nullInitSqls() throws Exception {
+        //Used to fail with NPE
+        new DriverDataSource(Thread.currentThread().getContextClassLoader(), null, "jdbc:h2:mem:abc", "axel", "superS3cr3t", null).getConnection().close();
     }
 }
