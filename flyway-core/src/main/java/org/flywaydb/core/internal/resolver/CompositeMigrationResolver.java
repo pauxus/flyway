@@ -68,8 +68,7 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * @param customMigrationResolvers Custom Migration Resolvers.
      */
     public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
-        PlaceholderReplacer placeholderReplacer =
-                new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
+        PlaceholderReplacer placeholderReplacer = config.createPlaceholderReplacer();
         for (Location location : new Locations(config.getLocations()).getLocations()) {
             migrationResolvers.add(new SqlMigrationResolver(dbSupport, config, location, placeholderReplacer));
             migrationResolvers.add(new JdbcMigrationResolver(config, location));

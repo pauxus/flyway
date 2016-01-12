@@ -21,6 +21,7 @@ import javax.sql.DataSource;
 
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
+import org.flywaydb.core.internal.util.PlaceholderReplacer;
 import org.flywaydb.core.internal.util.scanner.Scanner;
 
 /**
@@ -63,4 +64,6 @@ public interface FlywayConfiguration {
     String[] getLocations();
 
     Scanner getScanner();
+
+    PlaceholderReplacer createPlaceholderReplacer();
 }

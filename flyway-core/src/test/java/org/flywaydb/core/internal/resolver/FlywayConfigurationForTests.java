@@ -24,6 +24,7 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.internal.util.Locations;
+import org.flywaydb.core.internal.util.PlaceholderReplacer;
 import org.flywaydb.core.internal.util.scanner.Scanner;
 
 /**
@@ -149,6 +150,11 @@ public class FlywayConfigurationForTests implements FlywayConfiguration {
     @Override
     public Scanner getScanner() {
         return scanner;
+    }
+
+    @Override
+    public PlaceholderReplacer createPlaceholderReplacer() {
+        return null;
     }
 
     @Override

@@ -1092,7 +1092,6 @@ public class Flyway implements FlywayConfiguration {
      * @param scanner   The Scanner for resolving migrations.
      * @return A new, fully configured, MigrationResolver instance.
      */
-    // TODO: adapt
     private MigrationResolver createMigrationResolver(DbSupport dbSupport, Scanner scanner) {
         return new CompositeMigrationResolver(dbSupport, this);
     }
@@ -1100,8 +1099,8 @@ public class Flyway implements FlywayConfiguration {
     /**
      * @return A new, fully configured, PlaceholderReplacer.
      */
-    // TODO: Adapt?
-    private PlaceholderReplacer createPlaceholderReplacer() {
+    @Override
+    public PlaceholderReplacer createPlaceholderReplacer() {
         if (placeholderReplacement) {
             return new PlaceholderReplacer(placeholders, placeholderPrefix, placeholderSuffix);
         }
