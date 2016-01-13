@@ -195,7 +195,7 @@ public class FlywayCallbackImpl implements FlywayCallback, ConfigurationAware {
 		return afterInfo;
 	}
 
-	public boolean isFlywayConfigurationSet() {
-	    return flywayConfiguration != null;
+	public void assertFlywayConfigurationSet() {
+		assertNotNull("Configuration must have been set", flywayConfiguration);
 	}
 }

@@ -28,6 +28,7 @@ import static org.junit.Assert.*;
  * Tests for Flyway Callbacks
  */
 public class FlywayCallbackSmallTest {
+
     @Test
     public void cleanTest() {
         Properties properties = createProperties("clean");
@@ -38,8 +39,6 @@ public class FlywayCallbackSmallTest {
         final Flyway flyway = new Flyway();
         flyway.configure(properties);
         flyway.setCallbacks(callbacks);
-
-        assertTrue(((FlywayCallbackImpl) flyway.getCallbacks()[0]).isFlywayConfigurationSet());
 
         assertNotNull(flyway.getDataSource());
 
