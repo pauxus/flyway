@@ -18,10 +18,14 @@ package org.flywaydb.core.internal.util.scanner;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.internal.util.FeatureDetector;
 import org.flywaydb.core.internal.util.Location;
+import org.flywaydb.core.internal.util.scanner.classpath.ClassPathScanner;
 import org.flywaydb.core.internal.util.scanner.classpath.ResourceAndClassScanner;
 import org.flywaydb.core.internal.util.scanner.classpath.android.AndroidScanner;
-import org.flywaydb.core.internal.util.scanner.classpath.ClassPathScanner;
 import org.flywaydb.core.internal.util.scanner.filesystem.FileSystemScanner;
+
+import java.lang.ref.WeakReference;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Scanner for Resources and Classes.
@@ -32,13 +36,27 @@ public class Scanner {
     private final ClassLoader classLoader;
     private final FileSystemScanner fileSystemScanner = new FileSystemScanner();
 
-    public Scanner(ClassLoader classLoader) {
+
+    private Scanner(ClassLoader classLoader) {
         this.classLoader = classLoader;
         if (new FeatureDetector(classLoader).isAndroidAvailable()) {
             resourceAndClassScanner = new AndroidScanner(classLoader);
         } else {
             resourceAndClassScanner = new ClassPathScanner(classLoader);
         }
+    }
+
+    private static Map<ClassLoader, WeakReference<Scanner>> scannerCache = new WeakHashMap<ClassLoader, WeakReference<Scanner>>();
+
+    public static synchronized Scanner create(ClassLoader classLoader) {
+        WeakReference<Scanner> result = scannerCache.get(classLoader);
+
+        if (result == null || result.get() == null) {
+            result = new WeakReference<Scanner>(new Scanner(classLoader));
+            scannerCache.put(classLoader, result);
+        }
+
+        return result.get();
     }
 
     /**

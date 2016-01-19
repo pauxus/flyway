@@ -1239,7 +1239,7 @@ public class Flyway implements FlywayConfiguration {
             MigrationResolver migrationResolver = createMigrationResolver(dbSupport);
 
             if (callbacks.length == 0) {
-                setCallbacks(new SqlScriptFlywayCallback(dbSupport, new Scanner(classLoader), locations, createPlaceholderReplacer(),
+                setCallbacks(new SqlScriptFlywayCallback(dbSupport, Scanner.create(classLoader), locations, createPlaceholderReplacer(),
                         encoding, sqlMigrationSuffix));
                 callbackAutoAdded = true;
             }

@@ -16,7 +16,6 @@
 package org.flywaydb.core.internal.resolver.sql;
 
 import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationType;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.resolver.MigrationResolver;
@@ -96,7 +95,7 @@ public class SqlMigrationResolver implements MigrationResolver {
      */
     public SqlMigrationResolver(DbSupport dbSupport, FlywayConfiguration config, Location location, PlaceholderReplacer placeholderReplacer) {
         this.dbSupport = dbSupport;
-        this.scanner = new Scanner(config.getClassLoader());
+        this.scanner = Scanner.create(config.getClassLoader());
         this.location = location;
         this.placeholderReplacer = placeholderReplacer;
         this.encoding = config.getEncoding();

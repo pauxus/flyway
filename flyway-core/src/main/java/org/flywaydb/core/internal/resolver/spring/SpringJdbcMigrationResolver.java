@@ -65,7 +65,7 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
     public SpringJdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
         this.configuration = configuration;
         this.location = location;
-        this.scanner = new Scanner(configuration.getClassLoader());
+        this.scanner = Scanner.create(configuration.getClassLoader());
     }
 
     public Collection<ResolvedMigration> resolveMigrations() {

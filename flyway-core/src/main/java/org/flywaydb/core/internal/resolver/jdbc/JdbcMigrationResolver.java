@@ -66,7 +66,7 @@ public class JdbcMigrationResolver implements MigrationResolver {
      */
     public JdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
         this.location = location;
-        this.scanner = new Scanner(configuration.getClassLoader());
+        this.scanner = Scanner.create(configuration.getClassLoader());
         this.configuration = configuration;
     }
 
