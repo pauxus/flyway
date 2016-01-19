@@ -15,14 +15,11 @@
  */
 package org.flywaydb.core.api;
 
-import java.util.Map;
-
-import javax.sql.DataSource;
-
 import org.flywaydb.core.api.callback.FlywayCallback;
 import org.flywaydb.core.api.resolver.MigrationResolver;
-import org.flywaydb.core.internal.util.PlaceholderReplacer;
-import org.flywaydb.core.internal.util.scanner.Scanner;
+
+import javax.sql.DataSource;
+import java.util.Map;
 
 /**
  * Readonly interface for main flyway configuration. Can be used to provide configuration data to migrations and callbacks.
