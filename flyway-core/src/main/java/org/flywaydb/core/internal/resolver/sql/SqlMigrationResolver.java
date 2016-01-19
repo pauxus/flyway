@@ -15,6 +15,8 @@
  */
 package org.flywaydb.core.internal.resolver.sql;
 
+import org.flywaydb.core.api.FlywayConfiguration;
+import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationType;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.resolver.MigrationResolver;
@@ -87,29 +89,21 @@ public class SqlMigrationResolver implements MigrationResolver {
     /**
      * Creates a new instance.
      *
-     * @param dbSupport                    The database-specific support.
-     * @param scanner                      The Scanner for loading migrations on the classpath.
-     * @param location                     The location on the classpath where to migrations are located.
-     * @param placeholderReplacer          The placeholder replacer to apply to sql migration scripts.
-     * @param encoding                     The encoding of Sql migrations.
-     * @param sqlMigrationPrefix           The prefix for sql migrations
-     * @param repeatableSqlMigrationPrefix The prefix for repeatable sql migrations
-     * @param sqlMigrationSeparator        The separator for sql migrations
-     * @param sqlMigrationSuffix           The suffix for sql migrations
+     * @param dbSupport             The database-specific support.
+     * @param config                The configurration instance.
+     * @param location              The location on the classpath where to migrations are located.
+     * @param placeholderReplacer   The placeholder replacer to apply to sql migration scripts.
      */
-    public SqlMigrationResolver(DbSupport dbSupport, Scanner scanner, Location location,
-                                PlaceholderReplacer placeholderReplacer, String encoding,
-                                String sqlMigrationPrefix, String repeatableSqlMigrationPrefix,
-                                String sqlMigrationSeparator, String sqlMigrationSuffix) {
+    public SqlMigrationResolver(DbSupport dbSupport, FlywayConfiguration config, Location location, PlaceholderReplacer placeholderReplacer) {
         this.dbSupport = dbSupport;
-        this.scanner = scanner;
+        this.scanner = new Scanner(config.getClassLoader());
         this.location = location;
         this.placeholderReplacer = placeholderReplacer;
-        this.encoding = encoding;
-        this.sqlMigrationPrefix = sqlMigrationPrefix;
-        this.repeatableSqlMigrationPrefix = repeatableSqlMigrationPrefix;
-        this.sqlMigrationSeparator = sqlMigrationSeparator;
-        this.sqlMigrationSuffix = sqlMigrationSuffix;
+        this.encoding = config.getEncoding();
+        this.sqlMigrationPrefix = config.getSqlMigrationPrefix();
+        this.repeatableSqlMigrationPrefix = config.getRepeatableSqlMigrationPrefix();
+        this.sqlMigrationSeparator = config.getSqlMigrationSeparator();
+        this.sqlMigrationSuffix = config.getSqlMigrationSuffix();
     }
 
     public List<ResolvedMigration> resolveMigrations() {
