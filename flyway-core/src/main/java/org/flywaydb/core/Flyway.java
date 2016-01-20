@@ -788,7 +788,6 @@ public class Flyway implements FlywayConfiguration {
      * @param callbacks The callbacks for lifecycle notifications. (default: none)
      */
     public void setCallbacks(FlywayCallback... callbacks) {
-        InjectionUtils.injectFlywayConfiguration(callbacks, this, null);
         this.callbacks = callbacks;
     }
 
@@ -1265,6 +1264,8 @@ public class Flyway implements FlywayConfiguration {
                         encoding, sqlMigrationSuffix));
                 callbackAutoAdded = true;
             }
+
+            InjectionUtils.injectFlywayConfiguration(callbacks, this);
 
             result = command.execute(connectionMetaDataTable, connectionUserObjects, migrationResolver, dbSupport, schemas);
         } finally {

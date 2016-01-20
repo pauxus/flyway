@@ -74,18 +74,4 @@ public class InjectionUtils {
             injectDbSupport(target, dbSupport);
         }
     }
-
-    /**
-     * Injects the given configuration and DbSupport in to all elements of an array.
-     * @param targets The List containing the Objects to be in injected into
-     * @param configuration The configuration to inject
-     * @param dbSupport The DbSupport to inject
-     * @param <T> The type of the elements (usually Callback or MigrationResolver)
-     */
-    public static synchronized  <T> void injectFlywayConfiguration(T[] targets, FlywayConfiguration configuration, DbSupport dbSupport) {
-        for (T target : targets) {
-            injectFlywayConfiguration(target, configuration);
-            injectDbSupport(target, dbSupport);
-        }
-    }
 }

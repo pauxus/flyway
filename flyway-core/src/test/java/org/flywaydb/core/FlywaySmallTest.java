@@ -134,17 +134,6 @@ public class FlywaySmallTest {
     }
 
     @Test
-    public void configureCustomConfigAwareMigrationResolvers() {
-        Properties properties = new Properties();
-        properties.setProperty("flyway.resolvers", MyConfigurationAwareCustomMigrationResolver.class.getName());
-
-        Flyway flyway = new Flyway();
-        flyway.configure(properties);
-
-        ((MyConfigurationAwareCustomMigrationResolver) flyway.getResolvers()[0]).assertFlywayConfigurationIsSet();
-    }
-
-    @Test
     public void configureWithExistingDataSource() {
         DataSource dataSource = new DriverDataSource(Thread.currentThread().getContextClassLoader(), null, "jdbc:h2:mem:flyway_test;DB_CLOSE_DELAY=-1", "sa", "");
 

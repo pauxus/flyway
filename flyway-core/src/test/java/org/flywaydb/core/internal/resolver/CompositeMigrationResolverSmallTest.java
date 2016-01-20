@@ -73,7 +73,6 @@ public class CompositeMigrationResolverSmallTest {
         assertEquals("99.2.0", migrationList.get(2).getVersion().getVersion());
     }
 
-
     @Test
     public void customResolversHaveConfigurationInjected() {
         MyConfigurationAwareCustomMigrationResolver configResolver = new MyConfigurationAwareCustomMigrationResolver();
