@@ -15,7 +15,6 @@
  */
 package org.flywaydb.core.internal.resolver;
 
-import org.flywaydb.core.api.ConfigurationAware;
 import org.flywaydb.core.api.FlywayConfiguration;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.resolver.MigrationResolver;
@@ -24,16 +23,10 @@ import org.flywaydb.core.internal.dbsupport.DbSupport;
 import org.flywaydb.core.internal.resolver.jdbc.JdbcMigrationResolver;
 import org.flywaydb.core.internal.resolver.spring.SpringJdbcMigrationResolver;
 import org.flywaydb.core.internal.resolver.sql.SqlMigrationResolver;
-import org.flywaydb.core.internal.util.*;
-import org.flywaydb.core.internal.util.scanner.Scanner;
+import org.flywaydb.core.internal.util.FeatureDetector;
+import org.flywaydb.core.internal.util.InjectionUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Facility for retrieving and sorting the available migrations from the classpath through the various migration
@@ -58,11 +51,13 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * @param config                   The configuration object.
      */
     public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
-        migrationResolvers.add(new SqlMigrationResolver());
-        migrationResolvers.add(new JdbcMigrationResolver());
+        if (!config.isSkipDefaultResolvers()) {
+            migrationResolvers.add(new SqlMigrationResolver());
+            migrationResolvers.add(new JdbcMigrationResolver());
 
-        if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
-            migrationResolvers.add(new SpringJdbcMigrationResolver());
+            if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
+                migrationResolvers.add(new SpringJdbcMigrationResolver());
+            }
         }
 
         migrationResolvers.addAll(Arrays.asList(config.getResolvers()));
@@ -99,6 +94,11 @@ public class CompositeMigrationResolver implements MigrationResolver {
         checkForIncompatibilities(migrations);
 
         return migrations;
+    }
+
+    /* private -> for testing */
+    Collection<MigrationResolver> getMigrationResolvers() {
+        return migrationResolvers;
     }
 
     /**
