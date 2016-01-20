@@ -92,7 +92,7 @@ public class FlywayMediumTest {
         assertEquals(MigrationState.ABOVE_TARGET, flyway.info().all()[3].getState());
 
         flyway.migrate();
-        assertEquals(-976972276, flyway.info().current().getChecksum().intValue());
+        assertEquals(-722178914, flyway.info().current().getChecksum().intValue());
         assertEquals("1.1", flyway.info().current().getVersion().toString());
         assertEquals(MigrationState.SUCCESS, flyway.info().current().getState());
         assertEquals(4, flyway.info().all().length);
@@ -116,7 +116,7 @@ public class FlywayMediumTest {
 
         Flyway flyway = new Flyway();
         flyway.setDataSource(dataSource);
-
+        flyway.setSqlMigrationPrefix("");
         flyway.setLocations("migration/callback");
         flyway.migrate();
         assertEquals("1", flyway.info().current().getVersion().toString());
@@ -149,7 +149,7 @@ public class FlywayMediumTest {
     }
 
     @Test
-    public void infoInit() throws Exception {
+    public void infoBaseline() throws Exception {
         DriverDataSource dataSource =
                 new DriverDataSource(Thread.currentThread().getContextClassLoader(), null, "jdbc:h2:mem:flyway_db_info_init;DB_CLOSE_DELAY=-1", "sa", "");
 
@@ -164,7 +164,7 @@ public class FlywayMediumTest {
     }
 
     @Test
-    public void initAgainWithSameVersion() throws Exception {
+    public void baselineAgainWithSameVersion() throws Exception {
         DriverDataSource dataSource =
                 new DriverDataSource(Thread.currentThread().getContextClassLoader(), null, "jdbc:h2:mem:flyway_db_init_same;DB_CLOSE_DELAY=-1", "sa", "");
 
@@ -183,7 +183,7 @@ public class FlywayMediumTest {
     }
 
     @Test(expected = FlywayException.class)
-    public void initAgainWithDifferentVersion() throws Exception {
+    public void baselineAgainWithDifferentVersion() throws Exception {
         DriverDataSource dataSource =
                 new DriverDataSource(Thread.currentThread().getContextClassLoader(), null, "jdbc:h2:mem:flyway_db_init_different;DB_CLOSE_DELAY=-1", "sa", "");
 
