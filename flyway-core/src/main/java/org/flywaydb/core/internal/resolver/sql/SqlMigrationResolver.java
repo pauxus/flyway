@@ -94,7 +94,7 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
                 continue;
             }
             Pair<MigrationVersion, String> info =
-                    extractVersionAndDescription(prefix, separator, suffix, resource);
+                    extractVersionAndDescription(prefix, separator, suffix, resource, location);
 
             ResolvedMigrationImpl migration = new ResolvedMigrationImpl();
             migration.setVersion(info.getLeft());
@@ -108,7 +108,7 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
         }
     }
 
-    protected Pair<MigrationVersion, String> extractVersionAndDescription(String prefix, String separator, String suffix, Resource resource) {
+    protected Pair<MigrationVersion, String> extractVersionAndDescription(String prefix, String separator, String suffix, Resource resource, Location location) {
         return MigrationInfoHelper.extractVersionAndDescription(resource.getFilename(), prefix, separator, suffix);
     }
 
