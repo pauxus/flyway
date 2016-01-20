@@ -76,17 +76,17 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
         return migrations;
     }
 
-    private PlaceholderReplacer createPlaceholderReplacer(FlywayConfiguration config) {
+    protected PlaceholderReplacer createPlaceholderReplacer(FlywayConfiguration config) {
         if (config.isPlaceholderReplacement()) {
             return new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
         }
         return PlaceholderReplacer.NO_PLACEHOLDERS;
     }
 
-    public void scanForMigrations(Location location, String prefix, String separator, String suffix) {
+    protected void scanForMigrations(Location location, String prefix, String separator, String suffix) {
         for (Resource resource : scanner.scanForResources(location, prefix, suffix)) {
             Pair<MigrationVersion, String> info =
-                    MigrationInfoHelper.extractVersionAndDescription(resource.getFilename(), prefix, separator, suffix);
+                    extractVersionAndDescription(prefix, separator, suffix, resource);
 
             ResolvedMigrationImpl migration = new ResolvedMigrationImpl();
             migration.setVersion(info.getLeft());
@@ -100,13 +100,17 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
         }
     }
 
+    protected Pair<MigrationVersion, String> extractVersionAndDescription(String prefix, String separator, String suffix, Resource resource) {
+        return MigrationInfoHelper.extractVersionAndDescription(resource.getFilename(), prefix, separator, suffix);
+    }
+
     /**
      * Extracts the script name from this resource.
      *
      * @param resource The resource to process.
      * @return The script name.
      */
-    /* private -> for testing */ String extractScriptName(Resource resource, Location location) {
+    protected String extractScriptName(Resource resource, Location location) {
         if (location.getPath().isEmpty()) {
             return resource.getLocation();
         }

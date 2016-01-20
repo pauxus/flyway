@@ -15,6 +15,7 @@
  */
 package org.flywaydb.core.internal.resolver;
 
+import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.MigrationType;
 import org.flywaydb.core.api.MigrationVersion;
@@ -54,6 +55,24 @@ public class CompositeMigrationResolverSmallTest {
         assertEquals("Virtual Migration", migrationList.get(2).getDescription());
         assertEquals("Add foreign key", migrationList.get(3).getDescription());
     }
+
+    @Test
+    public void replaceResolverWithSubclass() {
+        FlywayConfigurationForTests config = createWithLocations("migration/subdir");
+        config.setSkipDefaultResolvers(true);
+        config.setResolvers(new CustomSqlMigrationResolver());
+
+        MigrationResolver migrationResolver = new CompositeMigrationResolver(null, config);
+
+        Collection<ResolvedMigration> migrations = migrationResolver.resolveMigrations();
+        List<ResolvedMigration> migrationList = new ArrayList<ResolvedMigration>(migrations);
+
+        assertEquals(3, migrations.size());
+        assertEquals("99.1", migrationList.get(0).getVersion().getVersion());
+        assertEquals("99.1.1", migrationList.get(1).getVersion().getVersion());
+        assertEquals("99.2.0", migrationList.get(2).getVersion().getVersion());
+    }
+
 
     @Test
     public void customResolversHaveConfigurationInjected() {

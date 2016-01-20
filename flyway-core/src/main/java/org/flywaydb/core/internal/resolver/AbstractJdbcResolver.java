@@ -99,7 +99,7 @@ public abstract class AbstractJdbcResolver<T> implements MigrationResolver, Conf
                         + " => ensure it starts with V or R," +
                         " or implement org.flywaydb.core.api.migration.MigrationInfoProvider for non-default naming");
             }
-            Pair<MigrationVersion, String> info = MigrationInfoHelper.extractVersionAndDescription(shortName, prefix, "__", "");
+            Pair<MigrationVersion, String> info = extractVersionAndDescription(shortName, prefix);
             version = info.getLeft();
             description = info.getRight();
         }
@@ -111,5 +111,9 @@ public abstract class AbstractJdbcResolver<T> implements MigrationResolver, Conf
         resolvedMigration.setChecksum(checksum);
         resolvedMigration.setType(getMigrationType());
         return resolvedMigration;
+    }
+
+    protected Pair<MigrationVersion, String> extractVersionAndDescription(String shortName, String prefix) {
+        return MigrationInfoHelper.extractVersionAndDescription(shortName, prefix, "__", "");
     }
 }

@@ -808,7 +808,7 @@ public class Flyway implements FlywayConfiguration {
      * @param resolvers The custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
     public void setResolvers(MigrationResolver... resolvers) {
-        InjectionUtils.injectFlywayConfiguration(resolvers, this, null);
+        // InjectionUtils.injectFlywayConfiguration(resolvers, this, null);
         this.resolvers = resolvers;
     }
 
