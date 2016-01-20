@@ -22,6 +22,7 @@ import org.flywaydb.core.internal.dbsupport.*;
 import org.flywaydb.core.internal.info.MigrationInfoDumper;
 import org.flywaydb.core.internal.resolver.FlywayConfigurationForTests;
 import org.flywaydb.core.internal.resolver.sql.SqlMigrationResolver;
+import org.flywaydb.core.internal.util.InjectionUtils;
 import org.flywaydb.core.internal.util.Location;
 import org.flywaydb.core.internal.util.PlaceholderReplacer;
 import org.flywaydb.core.internal.util.scanner.Scanner;
@@ -37,10 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -225,12 +223,10 @@ public abstract class MigrationTestCase {
      * @param migrationInfo The migration to check.
      */
     private void assertChecksum(MigrationInfo migrationInfo) {
-        FlywayConfiguration config = FlywayConfigurationForTests.create();
-        SqlMigrationResolver sqlMigrationResolver = new SqlMigrationResolver(
-                dbSupport, config,
-                new Location(getBasedir()),
-                PlaceholderReplacer.NO_PLACEHOLDERS);
-        List<ResolvedMigration> migrations = sqlMigrationResolver.resolveMigrations();
+        FlywayConfiguration config = FlywayConfigurationForTests.createWithLocations(getBasedir());
+        SqlMigrationResolver sqlMigrationResolver = InjectionUtils.injectFlywayConfiguration(new SqlMigrationResolver(), config);
+
+        Collection<ResolvedMigration> migrations = sqlMigrationResolver.resolveMigrations();
         for (ResolvedMigration migration : migrations) {
             if (migration.getVersion().toString().equals(migrationInfo.getVersion().toString())) {
                 assertEquals("Wrong checksum for " + migrationInfo.getScript(), migration.getChecksum(), migrationInfo.getChecksum());

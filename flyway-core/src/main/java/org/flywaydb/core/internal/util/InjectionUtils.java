@@ -55,13 +55,6 @@ public class InjectionUtils {
         return target;
     }
 
-    public static synchronized <T> T instantiateAndInjectConfiguration(String className, ClassLoader classLoader, FlywayConfiguration config, DbSupport dbSupport) throws Exception {
-        T result = ClassUtils.instantiate(className, classLoader);
-        injectFlywayConfiguration(result, config);
-        injectDbSupport(result, dbSupport);
-        return result;
-    }
-
     public static synchronized <T> T instantiateAndInjectConfiguration(String className, ClassLoader classLoader, FlywayConfiguration config) throws Exception {
         T result = ClassUtils.instantiate(className, classLoader);
         injectFlywayConfiguration(result, config);

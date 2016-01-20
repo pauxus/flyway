@@ -25,13 +25,12 @@ import org.flywaydb.core.internal.resolver.DbSupportAware;
 import org.flywaydb.core.internal.resolver.MigrationInfoHelper;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationComparator;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationImpl;
-import org.flywaydb.core.internal.util.Location;
-import org.flywaydb.core.internal.util.Pair;
-import org.flywaydb.core.internal.util.PlaceholderReplacer;
+import org.flywaydb.core.internal.util.*;
 import org.flywaydb.core.internal.util.scanner.Resource;
 import org.flywaydb.core.internal.util.scanner.Scanner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.CRC32;
@@ -46,66 +45,10 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
      */
     private DbSupport dbSupport;
 
-    /**
-     * The scanner to use.
-     */
-    private final Scanner scanner;
-
-    /**
-     * The base directory on the classpath where to migrations are located.
-     */
-    private final Location location;
-
-    /**
-     * The placeholder replacer to apply to sql migration scripts.
-     */
-    private final PlaceholderReplacer placeholderReplacer;
-
-    /**
-     * The encoding of Sql migrations.
-     */
-    private final String encoding;
-
-    /**
-     * The prefix for sql migrations
-     */
-    private final String sqlMigrationPrefix;
-
-    /**
-     * The prefix for repeatable sql migrations
-     */
-    private final String repeatableSqlMigrationPrefix;
-
-    /**
-     * The separator for sql migrations
-     */
-    private final String sqlMigrationSeparator;
-
-    /**
-     * The suffix for sql migrations
-     */
-    private final String sqlMigrationSuffix;
     private FlywayConfiguration flywayConfiguration;
-
-    /**
-     * Creates a new instance.
-     *
-     * @param dbSupport             The database-specific support.
-     * @param config                The configurration instance.
-     * @param location              The location on the classpath where to migrations are located.
-     * @param placeholderReplacer   The placeholder replacer to apply to sql migration scripts.
-     */
-    public SqlMigrationResolver(DbSupport dbSupport, FlywayConfiguration config, Location location, PlaceholderReplacer placeholderReplacer) {
-        this.dbSupport = dbSupport;
-        this.scanner = Scanner.create(config.getClassLoader());
-        this.location = location;
-        this.placeholderReplacer = placeholderReplacer;
-        this.encoding = config.getEncoding();
-        this.sqlMigrationPrefix = config.getSqlMigrationPrefix();
-        this.repeatableSqlMigrationPrefix = config.getRepeatableSqlMigrationPrefix();
-        this.sqlMigrationSeparator = config.getSqlMigrationSeparator();
-        this.sqlMigrationSuffix = config.getSqlMigrationSuffix();
-    }
+    private List<ResolvedMigration> migrations;
+    private Scanner scanner;
+    private PlaceholderReplacer placeholderReplacer;
 
     @Override
     public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
@@ -117,17 +60,30 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
         this.dbSupport = dbSupport;
     }
 
-    public List<ResolvedMigration> resolveMigrations() {
-        List<ResolvedMigration> migrations = new ArrayList<ResolvedMigration>();
+    @Override
+    public Collection<ResolvedMigration> resolveMigrations() {
+        migrations = new ArrayList<ResolvedMigration>();
+        scanner = Scanner.create(flywayConfiguration.getClassLoader());
 
-        scanForMigrations(migrations, sqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix);
-        scanForMigrations(migrations, repeatableSqlMigrationPrefix, sqlMigrationSeparator, sqlMigrationSuffix);
+        placeholderReplacer = createPlaceholderReplacer(flywayConfiguration);
+        for (Location location : new Locations(flywayConfiguration.getLocations()).getLocations()) {
+            scanForMigrations(location, flywayConfiguration.getSqlMigrationPrefix(), flywayConfiguration.getSqlMigrationSeparator(), flywayConfiguration.getSqlMigrationSuffix());
+            scanForMigrations(location, flywayConfiguration.getRepeatableSqlMigrationPrefix(), flywayConfiguration.getSqlMigrationSeparator(), flywayConfiguration.getSqlMigrationSuffix());
+        }
 
         Collections.sort(migrations, new ResolvedMigrationComparator());
+
         return migrations;
     }
 
-    public void scanForMigrations(List<ResolvedMigration> migrations, String prefix, String separator, String suffix) {
+    private PlaceholderReplacer createPlaceholderReplacer(FlywayConfiguration config) {
+        if (config.isPlaceholderReplacement()) {
+            return new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
+        }
+        return PlaceholderReplacer.NO_PLACEHOLDERS;
+    }
+
+    public void scanForMigrations(Location location, String prefix, String separator, String suffix) {
         for (Resource resource : scanner.scanForResources(location, prefix, suffix)) {
             Pair<MigrationVersion, String> info =
                     MigrationInfoHelper.extractVersionAndDescription(resource.getFilename(), prefix, separator, suffix);
@@ -135,11 +91,11 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
             ResolvedMigrationImpl migration = new ResolvedMigrationImpl();
             migration.setVersion(info.getLeft());
             migration.setDescription(info.getRight());
-            migration.setScript(extractScriptName(resource));
+            migration.setScript(extractScriptName(resource, location));
             migration.setChecksum(calculateChecksum(resource.loadAsBytes()));
             migration.setType(MigrationType.SQL);
             migration.setPhysicalLocation(resource.getLocationOnDisk());
-            migration.setExecutor(new SqlMigrationExecutor(dbSupport, resource, placeholderReplacer, encoding));
+            migration.setExecutor(new SqlMigrationExecutor(dbSupport, resource, placeholderReplacer, flywayConfiguration.getEncoding()));
             migrations.add(migration);
         }
     }
@@ -150,7 +106,7 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
      * @param resource The resource to process.
      * @return The script name.
      */
-    /* private -> for testing */ String extractScriptName(Resource resource) {
+    /* private -> for testing */ String extractScriptName(Resource resource, Location location) {
         if (location.getPath().isEmpty()) {
             return resource.getLocation();
         }

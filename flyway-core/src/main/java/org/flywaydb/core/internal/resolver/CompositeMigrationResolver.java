@@ -58,26 +58,16 @@ public class CompositeMigrationResolver implements MigrationResolver {
      * @param config                   The configuration object.
      */
     public CompositeMigrationResolver(DbSupport dbSupport, FlywayConfiguration config) {
-        PlaceholderReplacer placeholderReplacer = createPlaceholderReplacer(config);
-        for (Location location : new Locations(config.getLocations()).getLocations()) {
-            migrationResolvers.add(new SqlMigrationResolver(dbSupport, config, location, placeholderReplacer));
-            migrationResolvers.add(new JdbcMigrationResolver(config, location));
+        migrationResolvers.add(new SqlMigrationResolver());
+        migrationResolvers.add(new JdbcMigrationResolver());
 
-            if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
-                migrationResolvers.add(new SpringJdbcMigrationResolver(config, location));
-            }
+        if (new FeatureDetector(config.getClassLoader()).isSpringJdbcAvailable()) {
+            migrationResolvers.add(new SpringJdbcMigrationResolver());
         }
 
         migrationResolvers.addAll(Arrays.asList(config.getResolvers()));
 
         InjectionUtils.injectFlywayConfiguration(migrationResolvers, config, dbSupport);
-    }
-
-    private PlaceholderReplacer createPlaceholderReplacer(FlywayConfiguration config) {
-        if (config.isPlaceholderReplacement()) {
-            return new PlaceholderReplacer(config.getPlaceholders(), config.getPlaceholderPrefix(), config.getPlaceholderSuffix());
-        }
-        return PlaceholderReplacer.NO_PLACEHOLDERS;
     }
 
     /**

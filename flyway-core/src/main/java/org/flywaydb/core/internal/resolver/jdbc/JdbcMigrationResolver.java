@@ -24,14 +24,11 @@ import org.flywaydb.core.api.resolver.ResolvedMigration;
 import org.flywaydb.core.internal.resolver.MigrationInfoHelper;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationComparator;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationImpl;
-import org.flywaydb.core.internal.util.ClassUtils;
-import org.flywaydb.core.internal.util.InjectionUtils;
-import org.flywaydb.core.internal.util.Location;
-import org.flywaydb.core.internal.util.Pair;
-import org.flywaydb.core.internal.util.StringUtils;
+import org.flywaydb.core.internal.util.*;
 import org.flywaydb.core.internal.util.scanner.Scanner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -40,49 +37,37 @@ import java.util.List;
  * or V1_1_3__Description.
  */
 public class JdbcMigrationResolver implements MigrationResolver, ConfigurationAware {
-    /**
-     * The base package on the classpath where to migrations are located.
-     */
-    private final Location location;
 
-    /**
-     * The Scanner to use.
-     */
-    private Scanner scanner;
-
-    /**
-     * The flyway master flywayConfiguration.
-     */
     private FlywayConfiguration flywayConfiguration;
-
-    /**
-     * Creates a new instance.
-     *
-     * @param configuration The configurration instance.
-     * @param location The base package on the classpath where to migrations are located.
-     */
-    public JdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
-        this.location = location;
-        this.scanner = Scanner.create(configuration.getClassLoader());
-        this.flywayConfiguration = configuration;
-    }
+    private List<ResolvedMigration> migrations;
+    private Scanner scanner;
 
     @Override
     public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
         this.flywayConfiguration = flywayConfiguration;
     }
 
-    public List<ResolvedMigration> resolveMigrations() {
-        List<ResolvedMigration> migrations = new ArrayList<ResolvedMigration>();
+    @Override
+    public Collection<ResolvedMigration> resolveMigrations() {
+        migrations = new ArrayList<ResolvedMigration>();
 
-        if (!location.isClassPath()) {
-            return migrations;
+        scanner = Scanner.create(flywayConfiguration.getClassLoader());
+        for (Location location : new Locations(flywayConfiguration.getLocations()).getLocations()) {
+            if (!location.isClassPath()) continue;
+            resolveMigrationsFromSingleLocation(location);
         }
+
+        Collections.sort(migrations, new ResolvedMigrationComparator());
+
+        return migrations;
+    }
+
+    protected Collection<ResolvedMigration> resolveMigrationsFromSingleLocation(Location location) {
 
         try {
             Class<?>[] classes = scanner.scanForClasses(location, JdbcMigration.class);
             for (Class<?> clazz : classes) {
-                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), flywayConfiguration);
+                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), flywayConfiguration.getClassLoader(), flywayConfiguration);
 
                 ResolvedMigrationImpl migrationInfo = extractMigrationInfo(jdbcMigration);
                 migrationInfo.setPhysicalLocation(ClassUtils.getLocationOnDisk(clazz));
@@ -94,7 +79,6 @@ public class JdbcMigrationResolver implements MigrationResolver, ConfigurationAw
             throw new FlywayException("Unable to resolve Jdbc Java migrations in location: " + location, e);
         }
 
-        Collections.sort(migrations, new ResolvedMigrationComparator());
         return migrations;
     }
 
