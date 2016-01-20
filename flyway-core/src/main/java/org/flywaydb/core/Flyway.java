@@ -773,14 +773,8 @@ public class Flyway implements FlywayConfiguration {
      * @param callbacks The callbacks for lifecycle notifications. (default: none)
      */
     public void setCallbacks(FlywayCallback... callbacks) {
-        injectConfiguration(callbacks);
+        InjectionUtils.injectFlywayConfiguration(callbacks, this, null);
         this.callbacks = callbacks;
-    }
-
-    private void injectConfiguration(Object[] objects) {
-        for (Object object : objects) {
-            InjectionUtils.injectFlywayConfiguration(object, this);
-        }
     }
 
     /**
@@ -799,7 +793,7 @@ public class Flyway implements FlywayConfiguration {
      * @param resolvers The custom MigrationResolvers to be used in addition to the built-in ones for resolving Migrations to apply. (default: empty list)
      */
     public void setResolvers(MigrationResolver... resolvers) {
-        injectConfiguration(resolvers);
+        InjectionUtils.injectFlywayConfiguration(resolvers, this, null);
         this.resolvers = resolvers;
     }
 

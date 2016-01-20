@@ -20,6 +20,8 @@ import org.flywaydb.core.api.MigrationType;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.api.resolver.ResolvedMigration;
+import org.flywaydb.core.internal.dbsupport.DbSupport;
+import org.flywaydb.core.internal.dbsupport.mysql.MySQLDbSupport;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -27,6 +29,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
+import static org.flywaydb.core.internal.resolver.FlywayConfigurationForTests.create;
+import static org.flywaydb.core.internal.resolver.FlywayConfigurationForTests.createWithLocations;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -36,7 +40,7 @@ import static org.junit.Assert.assertTrue;
 public class CompositeMigrationResolverSmallTest {
     @Test
     public void resolveMigrationsMultipleLocations() {
-        FlywayConfigurationForTests config = FlywayConfigurationForTests.createWithLocations("migration/subdir/dir2", "migration.outoforder", "migration/subdir/dir1");
+        FlywayConfigurationForTests config = createWithLocations("migration/subdir/dir2", "migration.outoforder", "migration/subdir/dir1");
         config.setResolvers(new MyCustomMigrationResolver());
 
         MigrationResolver migrationResolver = new CompositeMigrationResolver(null, config);
@@ -50,6 +54,23 @@ public class CompositeMigrationResolverSmallTest {
         assertEquals("Virtual Migration", migrationList.get(2).getDescription());
         assertEquals("Add foreign key", migrationList.get(3).getDescription());
     }
+
+    @Test
+    public void customResolversHaveConfigurationInjected() {
+        MyConfigurationAwareCustomMigrationResolver configResolver = new MyConfigurationAwareCustomMigrationResolver();
+        MyDbSupportAwareCustomMigrationResolver dbSupportResolver = new MyDbSupportAwareCustomMigrationResolver();
+        FlywayConfigurationForTests config = create();
+        config.setResolvers(configResolver, dbSupportResolver);
+        DbSupport dbSupport = new MySQLDbSupport(null);
+        MigrationResolver migrationResolver = new CompositeMigrationResolver(dbSupport, config);
+
+        migrationResolver.resolveMigrations();
+
+        configResolver.assertFlywayConfigurationIsSet();
+        dbSupportResolver.assertFlywayConfigurationIsSet();
+        dbSupportResolver.assertDbSupportIsSet();
+    }
+
 
     /**
      * Checks that migrations are properly collected, eliminating all exact duplicates.

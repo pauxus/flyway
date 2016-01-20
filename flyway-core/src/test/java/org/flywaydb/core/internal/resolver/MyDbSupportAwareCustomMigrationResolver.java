@@ -17,16 +17,9 @@ package org.flywaydb.core.internal.resolver;
 
 import org.flywaydb.core.api.ConfigurationAware;
 import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.MigrationType;
-import org.flywaydb.core.api.MigrationVersion;
-import org.flywaydb.core.api.resolver.MigrationExecutor;
-import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.api.resolver.ResolvedMigration;
-import org.hamcrest.core.IsNull;
-import org.junit.Assert;
+import org.flywaydb.core.internal.dbsupport.DbSupport;
 
-import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -36,22 +29,23 @@ import static org.junit.Assert.assertThat;
 /**
 * Created by Axel on 3/7/14.
 */
-public class MyConfigurationAwareCustomMigrationResolver extends MyCustomMigrationResolver implements ConfigurationAware {
+public class MyDbSupportAwareCustomMigrationResolver extends MyConfigurationAwareCustomMigrationResolver implements DbSupportAware {
 
-    private FlywayConfiguration flywayConfiguration;
+
+    private DbSupport dbSupport;
 
     @Override
-    public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
-        this.flywayConfiguration = flywayConfiguration;
+    public void setDbSupport(DbSupport dbSupport) {
+        this.dbSupport = dbSupport;
     }
 
     @Override
     public List<ResolvedMigration> resolveMigrations() {
-        assertFlywayConfigurationIsSet();
-        return new ArrayList<ResolvedMigration>();
+        assertDbSupportIsSet();
+        return super.resolveMigrations();
     }
 
-    public void assertFlywayConfigurationIsSet() {
-        assertThat(flywayConfiguration, is(notNullValue()));
+    public void assertDbSupportIsSet() {
+        assertThat(dbSupport, is(notNullValue()));
     }
 }

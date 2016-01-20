@@ -15,12 +15,10 @@
  */
 package org.flywaydb.core.internal.util;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.flywaydb.core.api.ConfigurationAware;
 import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.internal.dbsupport.DbSupport;
+import org.flywaydb.core.internal.resolver.DbSupportAware;
 
 /**
  * Utility class for interfaced based injection.
@@ -34,20 +32,67 @@ public class InjectionUtils {
     /**
      * Injects the given flyway configuration into the target object if target implements the
      * {@link ConfigurationAware} interface. Does nothing if target is not configuration aware.
-     *
      * @param target The object to inject the configuration into.
      * @param configuration The configuration to inject.
      */
-    public static void injectFlywayConfiguration(Object target, FlywayConfiguration configuration) {
+    public static <T> T injectFlywayConfiguration(T target, FlywayConfiguration configuration) {
         if (target instanceof ConfigurationAware) {
             ((ConfigurationAware) target).setFlywayConfiguration(configuration);
         }
+        return target;
     }
 
-    // Must be synchronized for the Maven Parallel Junit runner to work
+    /**
+     * Injects the given flyway configuration into the target object if target implements the
+     * {@link } interface. Does nothing if target is not configuration aware.
+     * @param target The object to inject the configuration into.
+     * @param dbSupport The dbSupport instance to inject.
+     */
+    public static <T> T injectDbSupport(T target, DbSupport dbSupport) {
+        if (target instanceof DbSupportAware) {
+            ((DbSupportAware) target).setDbSupport(dbSupport);
+        }
+        return target;
+    }
+
+    public static synchronized <T> T instantiateAndInjectConfiguration(String className, ClassLoader classLoader, FlywayConfiguration config, DbSupport dbSupport) throws Exception {
+        T result = ClassUtils.instantiate(className, classLoader);
+        injectFlywayConfiguration(result, config);
+        injectDbSupport(result, dbSupport);
+        return result;
+    }
+
     public static synchronized <T> T instantiateAndInjectConfiguration(String className, ClassLoader classLoader, FlywayConfiguration config) throws Exception {
         T result = ClassUtils.instantiate(className, classLoader);
         injectFlywayConfiguration(result, config);
         return result;
+    }
+
+    /**
+     * Injects the given configuration and DbSupport in to all elements of the List.
+     * @param targets The List containing the Objects to be in injected into
+     * @param configuration The configuration to inject
+     * @param dbSupport The DbSupport to inject
+     * @param <T> The type of the elements (usually Callback or MigrationResolver)
+     */
+    public static synchronized  <T> void injectFlywayConfiguration(Iterable<T> targets, FlywayConfiguration configuration, DbSupport dbSupport) {
+        for (T target : targets) {
+            injectFlywayConfiguration(target, configuration);
+            injectDbSupport(target, dbSupport);
+        }
+    }
+
+    /**
+     * Injects the given configuration and DbSupport in to all elements of an array.
+     * @param targets The List containing the Objects to be in injected into
+     * @param configuration The configuration to inject
+     * @param dbSupport The DbSupport to inject
+     * @param <T> The type of the elements (usually Callback or MigrationResolver)
+     */
+    public static synchronized  <T> void injectFlywayConfiguration(T[] targets, FlywayConfiguration configuration, DbSupport dbSupport) {
+        for (T target : targets) {
+            injectFlywayConfiguration(target, configuration);
+            injectDbSupport(target, dbSupport);
+        }
     }
 }

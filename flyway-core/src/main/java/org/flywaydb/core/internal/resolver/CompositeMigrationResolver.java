@@ -24,10 +24,7 @@ import org.flywaydb.core.internal.dbsupport.DbSupport;
 import org.flywaydb.core.internal.resolver.jdbc.JdbcMigrationResolver;
 import org.flywaydb.core.internal.resolver.spring.SpringJdbcMigrationResolver;
 import org.flywaydb.core.internal.resolver.sql.SqlMigrationResolver;
-import org.flywaydb.core.internal.util.FeatureDetector;
-import org.flywaydb.core.internal.util.Location;
-import org.flywaydb.core.internal.util.Locations;
-import org.flywaydb.core.internal.util.PlaceholderReplacer;
+import org.flywaydb.core.internal.util.*;
 import org.flywaydb.core.internal.util.scanner.Scanner;
 
 import java.util.ArrayList;
@@ -72,6 +69,8 @@ public class CompositeMigrationResolver implements MigrationResolver {
         }
 
         migrationResolvers.addAll(Arrays.asList(config.getResolvers()));
+
+        InjectionUtils.injectFlywayConfiguration(migrationResolvers, config, dbSupport);
     }
 
     private PlaceholderReplacer createPlaceholderReplacer(FlywayConfiguration config) {

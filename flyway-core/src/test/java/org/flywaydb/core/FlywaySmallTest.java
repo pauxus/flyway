@@ -141,7 +141,7 @@ public class FlywaySmallTest {
         Flyway flyway = new Flyway();
         flyway.configure(properties);
 
-        assertTrue(((MyConfigurationAwareCustomMigrationResolver) flyway.getResolvers()[0]).isFlywayConfigurationSet());
+        ((MyConfigurationAwareCustomMigrationResolver) flyway.getResolvers()[0]).assertFlywayConfigurationIsSet();
     }
 
     @Test
