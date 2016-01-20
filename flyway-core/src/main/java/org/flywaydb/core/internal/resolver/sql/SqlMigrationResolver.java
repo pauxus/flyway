@@ -21,6 +21,7 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.resolver.MigrationResolver;
 import org.flywaydb.core.api.resolver.ResolvedMigration;
 import org.flywaydb.core.internal.dbsupport.DbSupport;
+import org.flywaydb.core.internal.resolver.DbSupportAware;
 import org.flywaydb.core.internal.resolver.MigrationInfoHelper;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationComparator;
 import org.flywaydb.core.internal.resolver.ResolvedMigrationImpl;
@@ -39,11 +40,11 @@ import java.util.zip.CRC32;
  * Migration resolver for sql files on the classpath. The sql files must have names like
  * V1__Description.sql or V1_1__Description.sql.
  */
-public class SqlMigrationResolver implements MigrationResolver {
+public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
     /**
      * Database-specific support.
      */
-    private final DbSupport dbSupport;
+    private DbSupport dbSupport;
 
     /**
      * The scanner to use.
@@ -84,6 +85,7 @@ public class SqlMigrationResolver implements MigrationResolver {
      * The suffix for sql migrations
      */
     private final String sqlMigrationSuffix;
+    private FlywayConfiguration flywayConfiguration;
 
     /**
      * Creates a new instance.
@@ -103,6 +105,16 @@ public class SqlMigrationResolver implements MigrationResolver {
         this.repeatableSqlMigrationPrefix = config.getRepeatableSqlMigrationPrefix();
         this.sqlMigrationSeparator = config.getSqlMigrationSeparator();
         this.sqlMigrationSuffix = config.getSqlMigrationSuffix();
+    }
+
+    @Override
+    public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
+        this.flywayConfiguration = flywayConfiguration;
+    }
+
+    @Override
+    public void setDbSupport(DbSupport dbSupport) {
+        this.dbSupport = dbSupport;
     }
 
     public List<ResolvedMigration> resolveMigrations() {

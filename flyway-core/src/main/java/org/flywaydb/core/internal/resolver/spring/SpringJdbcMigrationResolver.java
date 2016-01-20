@@ -15,10 +15,7 @@
  */
 package org.flywaydb.core.internal.resolver.spring;
 
-import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.FlywayException;
-import org.flywaydb.core.api.MigrationType;
-import org.flywaydb.core.api.MigrationVersion;
+import org.flywaydb.core.api.*;
 import org.flywaydb.core.api.migration.MigrationChecksumProvider;
 import org.flywaydb.core.api.migration.MigrationInfoProvider;
 import org.flywaydb.core.api.migration.spring.SpringJdbcMigration;
@@ -43,7 +40,7 @@ import java.util.List;
  * Migration resolver for Spring Jdbc migrations. The classes must have a name like V1 or V1_1_3 or V1__Description
  * or V1_1_3__Description.
  */
-public class SpringJdbcMigrationResolver implements MigrationResolver {
+public class SpringJdbcMigrationResolver implements MigrationResolver, ConfigurationAware {
     /**
      * The base package on the classpath where to migrations are located.
      */
@@ -54,7 +51,7 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
      */
     private Scanner scanner;
 
-    private FlywayConfiguration configuration;
+    private FlywayConfiguration flywayConfiguration;
 
     /**
      * Creates a new instance.
@@ -63,9 +60,14 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
      * @param location The base package on the classpath where to migrations are located.
      */
     public SpringJdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
-        this.configuration = configuration;
+        this.flywayConfiguration = configuration;
         this.location = location;
         this.scanner = Scanner.create(configuration.getClassLoader());
+    }
+
+    @Override
+    public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
+        this.flywayConfiguration = flywayConfiguration;
     }
 
     public Collection<ResolvedMigration> resolveMigrations() {
@@ -78,7 +80,7 @@ public class SpringJdbcMigrationResolver implements MigrationResolver {
         try {
             Class<?>[] classes = scanner.scanForClasses(location, SpringJdbcMigration.class);
             for (Class<?> clazz : classes) {
-                SpringJdbcMigration springJdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), configuration);
+                SpringJdbcMigration springJdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), flywayConfiguration);
 
                 ResolvedMigrationImpl migrationInfo = extractMigrationInfo(springJdbcMigration);
                 migrationInfo.setPhysicalLocation(ClassUtils.getLocationOnDisk(clazz));

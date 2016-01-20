@@ -15,10 +15,7 @@
  */
 package org.flywaydb.core.internal.resolver.jdbc;
 
-import org.flywaydb.core.api.FlywayConfiguration;
-import org.flywaydb.core.api.FlywayException;
-import org.flywaydb.core.api.MigrationType;
-import org.flywaydb.core.api.MigrationVersion;
+import org.flywaydb.core.api.*;
 import org.flywaydb.core.api.migration.MigrationChecksumProvider;
 import org.flywaydb.core.api.migration.MigrationInfoProvider;
 import org.flywaydb.core.api.migration.jdbc.JdbcMigration;
@@ -42,7 +39,7 @@ import java.util.List;
  * Migration resolver for Jdbc migrations. The classes must have a name like R__My_description, V1__Description
  * or V1_1_3__Description.
  */
-public class JdbcMigrationResolver implements MigrationResolver {
+public class JdbcMigrationResolver implements MigrationResolver, ConfigurationAware {
     /**
      * The base package on the classpath where to migrations are located.
      */
@@ -54,9 +51,9 @@ public class JdbcMigrationResolver implements MigrationResolver {
     private Scanner scanner;
 
     /**
-     * The flyway master configuration.
+     * The flyway master flywayConfiguration.
      */
-    private FlywayConfiguration configuration;
+    private FlywayConfiguration flywayConfiguration;
 
     /**
      * Creates a new instance.
@@ -67,7 +64,12 @@ public class JdbcMigrationResolver implements MigrationResolver {
     public JdbcMigrationResolver(FlywayConfiguration configuration, Location location) {
         this.location = location;
         this.scanner = Scanner.create(configuration.getClassLoader());
-        this.configuration = configuration;
+        this.flywayConfiguration = configuration;
+    }
+
+    @Override
+    public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
+        this.flywayConfiguration = flywayConfiguration;
     }
 
     public List<ResolvedMigration> resolveMigrations() {
@@ -80,7 +82,7 @@ public class JdbcMigrationResolver implements MigrationResolver {
         try {
             Class<?>[] classes = scanner.scanForClasses(location, JdbcMigration.class);
             for (Class<?> clazz : classes) {
-                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), configuration);
+                JdbcMigration jdbcMigration = InjectionUtils.instantiateAndInjectConfiguration(clazz.getName(), scanner.getClassLoader(), flywayConfiguration);
 
                 ResolvedMigrationImpl migrationInfo = extractMigrationInfo(jdbcMigration);
                 migrationInfo.setPhysicalLocation(ClassUtils.getLocationOnDisk(clazz));
