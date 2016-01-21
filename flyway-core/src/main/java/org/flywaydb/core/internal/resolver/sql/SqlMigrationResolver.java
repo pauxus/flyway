@@ -48,12 +48,12 @@ public class SqlMigrationResolver implements MigrationResolver, DbSupportAware {
     /**
      * Database-specific support.
      */
-    private DbSupport dbSupport;
+    protected DbSupport dbSupport;
 
-    private FlywayConfiguration flywayConfiguration;
-    private List<ResolvedMigration> migrations;
-    private Scanner scanner;
-    private PlaceholderReplacer placeholderReplacer;
+    protected FlywayConfiguration flywayConfiguration;
+    protected List<ResolvedMigration> migrations;
+    protected Scanner scanner;
+    protected PlaceholderReplacer placeholderReplacer;
 
     @Override
     public void setFlywayConfiguration(FlywayConfiguration flywayConfiguration) {
