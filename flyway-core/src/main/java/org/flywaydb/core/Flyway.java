@@ -1265,7 +1265,9 @@ public class Flyway implements FlywayConfiguration {
                 callbackAutoAdded = true;
             }
 
-            InjectionUtils.injectFlywayConfiguration(callbacks, this);
+            for (FlywayCallback callback : callbacks) {
+                InjectionUtils.injectFlywayConfiguration(callback, this);
+            }
 
             result = command.execute(connectionMetaDataTable, connectionUserObjects, migrationResolver, dbSupport, schemas);
         } finally {
