@@ -340,32 +340,22 @@ public class OracleSchema extends Schema<OracleDbSupport> {
     @Override
     protected Table[] doAllTables() throws SQLException {
         List<String> tableNames = jdbcTemplate.queryForStringList(
-                // For every table this query will count the number of references (including the transitive ones)
-                // and order the result list using that value.
-                " SELECT r FROM" +
-                        "   (SELECT CONNECT_BY_ROOT t r FROM" +
-                        "     (SELECT DISTINCT c1.table_name f, NVL(c2.table_name, at.table_name) t" +
-                        "     FROM all_constraints c1" +
-                        "       RIGHT JOIN all_constraints c2 ON c2.constraint_name = c1.r_constraint_name" +
-                        "       RIGHT JOIN all_tables at ON at.table_name = c2.table_name" +
-                        "     WHERE at.owner = ?" +
+                "SELECT table_name FROM all_tables WHERE owner = ?"
                         // Ignore Recycle bin objects
-                        "       AND at.table_name NOT LIKE 'BIN$%'" +
+                        + " AND table_name NOT LIKE 'BIN$%'"
                         // Ignore Spatial Index Tables as they get dropped automatically when the index gets dropped.
-                        "       AND at.table_name NOT LIKE 'MDRT_%$'" +
+                        + " AND table_name NOT LIKE 'MDRT_%$'"
                         // Ignore Materialized View Logs
-                        "       AND at.table_name NOT LIKE 'MLOG$%' AND at.table_name NOT LIKE 'RUPD$%'" +
+                        + " AND table_name NOT LIKE 'MLOG$%' AND table_name NOT LIKE 'RUPD$%'"
                         // Ignore Oracle Text Index Tables
-                        "       AND at.table_name NOT LIKE 'DR$%'" +
+                        + " AND table_name NOT LIKE 'DR$%'"
                         // Ignore Index Organized Tables
-                        "       AND at.table_name NOT LIKE 'SYS_IOT_OVER_%'" +
+                        + " AND table_name NOT LIKE 'SYS_IOT_OVER_%'"
                         // Ignore Nested Tables
-                        "       AND at.nested != 'YES'" +
+                        + " AND nested != 'YES'"
                         // Ignore Nested Tables
-                        "       AND at.secondary != 'Y')" +
-                        "   CONNECT BY NOCYCLE PRIOR f = t)" +
-                        " GROUP BY r" +
-                        " ORDER BY COUNT(*)", name);
+                        + " AND secondary != 'Y'", name
+        );
 
         Table[] tables = new Table[tableNames.size()];
         for (int i = 0; i < tableNames.size(); i++) {
