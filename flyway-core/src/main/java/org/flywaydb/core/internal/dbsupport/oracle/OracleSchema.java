@@ -1,5 +1,5 @@
-/**
- * Copyright 2010-2015 Boxfuse GmbH
+/*
+ * Copyright 2010-2017 Boxfuse GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -339,7 +339,80 @@ public class OracleSchema extends Schema<OracleDbSupport> {
 
     @Override
     protected Table[] doAllTables() throws SQLException {
-        List<String> tableNames = jdbcTemplate.queryForStringList(
+
+        List<String> tableNames;
+
+        if (majorOracleVersion() >= 11)
+            tableNames = allTableNamesOrderedByReferences();
+        else
+            tableNames = allTableNamesWithoutReferenceOrdering();
+
+        Table[] tables = new Table[tableNames.size()];
+        for (int i = 0; i < tableNames.size(); i++) {
+            tables[i] = new OracleTable(jdbcTemplate, dbSupport, this, tableNames.get(i));
+        }
+        return tables;
+    }
+
+    private int majorOracleVersion() throws SQLException {
+        String versionString = jdbcTemplate.queryForString("SELECT version FROM v%instance");
+        return Integer.parseInt(versionString.split("\\.", 2)[0]);
+    }
+
+    private List<String> allTableNamesOrderedByReferences() throws SQLException {
+        // reference tables has been introduced in Oracle 11g
+        return jdbcTemplate.queryForStringList(
+                "WITH ref_part_dependencies AS\n" +
+                        "(\n" +
+                        /* query to create parent-child dependency for reference partitioned tables (one level)*/
+                        "  SELECT at.table_name, at.owner, c2.table_name AS parent_table_name, c2.owner AS parent_owner\n" +
+                        "    FROM all_tables at\n" +
+                        "    JOIN all_part_tables apt\n" +
+                        "      ON apt.table_name = at.table_name AND\n" +
+                        "         apt.owner = at.owner AND\n" +
+                        "         apt.ref_ptn_constraint_name IS NOT NULL\n" +
+                        "    JOIN all_constraints c1\n" +
+                        "      ON apt.owner = c1.owner AND\n" +
+                        "         apt.ref_ptn_constraint_name = c1.constraint_name AND\n" +
+                        "         c1.constraint_type = 'R'\n" +
+                        "    JOIN all_constraints c2\n" +
+                        "      ON c2.owner = c1.owner AND\n" +
+                        "         c2.constraint_name = c1.r_constraint_name AND\n" +
+                        "         c2.constraint_type = 'P'),\n" +
+                        "all_table_levels(table_name,\n" +
+                        "owner,\n" +
+                        "parent_table_name,\n" +
+                        "parent_owner,\n" +
+                        "lev) AS\n" +
+                        "(\n" +
+                        /* create view of all tables. Referenced partitioned tables are ordered over an hierarchical view (all levels) */
+                        "  SELECT at.table_name, at.owner, NULL, NULL, 1 AS lev\n" +
+                        "    FROM all_tables at\n" +
+                        "    LEFT JOIN all_part_tables apt\n" +
+                        "      ON apt.table_name = at.table_name AND\n" +
+                        "         apt.owner = at.owner\n" +
+                        "   WHERE at.owner = ? AND\n" +
+                        "         at.table_name NOT LIKE 'BIN$%' AND\n" +
+                        "         at.table_name NOT LIKE 'MDRT_%$' AND\n" +
+                        "         at.table_name NOT LIKE 'MLOG$%' AND\n" +
+                        "         at.table_name NOT LIKE 'RUPD$%' AND\n" +
+                        "         at.table_name NOT LIKE 'DR$%' AND\n" +
+                        "         at.table_name NOT LIKE 'SYS_IOT_OVER_%' AND\n" +
+                        "         at.nested != 'YES' AND\n" +
+                        "         at.secondary != 'Y' AND\n" +
+                        "         apt.ref_ptn_constraint_name IS NULL\n" +
+                        "  UNION ALL\n" +
+                        "  SELECT h.table_name, h.owner, h.parent_table_name, h.parent_owner, r.lev + 1 AS lev\n" +
+                        "    FROM ref_part_dependencies h\n" +
+                        "    JOIN all_table_levels r\n" +
+                        "      ON h.parent_table_name = r.table_name AND\n" +
+                        "         h.parent_owner = r.owner)\n" +
+                        "SELECT table_name FROM all_table_levels ORDER BY lev DESC;\n", name);
+    }
+
+    private List<String> allTableNamesWithoutReferenceOrdering() throws SQLException {
+        // use the old, unsorted mechanism
+        return jdbcTemplate.queryForStringList(
                 "SELECT table_name FROM all_tables WHERE owner = ?"
                         // Ignore Recycle bin objects
                         + " AND table_name NOT LIKE 'BIN$%'"
@@ -354,14 +427,7 @@ public class OracleSchema extends Schema<OracleDbSupport> {
                         // Ignore Nested Tables
                         + " AND nested != 'YES'"
                         // Ignore Nested Tables
-                        + " AND secondary != 'Y'", name
-        );
-
-        Table[] tables = new Table[tableNames.size()];
-        for (int i = 0; i < tableNames.size(); i++) {
-            tables[i] = new OracleTable(jdbcTemplate, dbSupport, this, tableNames.get(i));
-        }
-        return tables;
+                        + " AND secondary != 'Y'", name);
     }
 
     @Override
